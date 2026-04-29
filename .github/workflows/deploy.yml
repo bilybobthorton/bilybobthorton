@@ -1,0 +1,74 @@
+name: SentinelCore CD — Deploy to VPS
+
+# Triggers on a version tag (v1.0.0) or manual dispatch.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy"
+        required: true
+        default: "claude/malware-detection-app-bRsUv"
+
+jobs:
+  deploy:
+    name: Deploy to production VPS
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Run CI checks before deploying
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: sentinelcore/requirements.txt
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y libmagic1 libfuzzy-dev build-essential
+
+      - name: Install Python deps + lint
+        working-directory: sentinelcore
+        run: |
+          pip install -r requirements.txt ruff
+          ruff check api/ engine/ --ignore E501
+
+      # SSH deploy
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy via SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          DEPLOY_BRANCH: ${{ github.event.inputs.branch || 'claude/malware-detection-app-bRsUv' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "$VPS_USER@$VPS_HOST" \
+            "cd /opt/sentinelcore/sentinelcore && bash scripts/deploy.sh $DEPLOY_BRANCH"
+
+      - name: Verify deployment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          DOMAIN: ${{ secrets.DOMAIN }}
+        run: |
+          sleep 10
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "https://$DOMAIN/health" || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "Deployment verified — /health returned 200"
+          else
+            echo "ERROR: /health returned $STATUS"
+            exit 1
+          fi
