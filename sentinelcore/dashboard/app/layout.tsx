@@ -20,6 +20,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
             <a href="/" className="text-sm text-slate-400 hover:text-white transition-colors">Scan</a>
             <a href="/alerts" className="text-sm text-slate-400 hover:text-white transition-colors">Alerts</a>
+            <a href="/yara" className="text-sm text-slate-400 hover:text-white transition-colors">YARA</a>
+            <a href="/billing" className="text-sm text-slate-400 hover:text-white transition-colors">Billing</a>
             <span className="ml-auto text-xs text-slate-500">v0.1.0 — Early Access</span>
           </div>
         </nav>

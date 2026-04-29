@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     virustotal_api_key: str = ""
     otx_api_key: str = ""
 
+    # Stripe billing
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_pro: str = ""
+    stripe_price_enterprise: str = ""
+
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
 
