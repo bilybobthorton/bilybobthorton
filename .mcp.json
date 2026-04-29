@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mempalace": {
+      "command": "/usr/local/bin/mempalace",
+      "args": ["mcp"],
+      "type": "stdio"
+    }
+  }
+}
