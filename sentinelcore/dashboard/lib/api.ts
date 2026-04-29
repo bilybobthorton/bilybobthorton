@@ -40,3 +40,43 @@ export async function lookupHash(hash: string) {
   if (!res.ok) throw new Error(`Hash lookup failed: ${res.statusText}`);
   return res.json();
 }
+
+export interface AgentAlert {
+  id: string;
+  remote_id: string;
+  agent_id: string;
+  hostname: string;
+  kind: string;
+  severity: string;
+  title: string;
+  description: string;
+  path: string | null;
+  mitre_technique: string | null;
+  process: Record<string, unknown> | null;
+  hashes: { md5: string; sha256: string } | null;
+  received_at: string;
+  agent_timestamp: string;
+}
+
+export async function fetchAlerts(params?: {
+  severity?: string;
+  kind?: string;
+  hostname?: string;
+  limit?: number;
+}): Promise<AgentAlert[]> {
+  const query = new URLSearchParams();
+  if (params?.severity) query.set("severity", params.severity);
+  if (params?.kind) query.set("kind", params.kind);
+  if (params?.hostname) query.set("hostname", params.hostname);
+  if (params?.limit) query.set("limit", String(params.limit));
+
+  const res = await fetch(`${API_BASE}/agent/alerts?${query}`);
+  if (!res.ok) throw new Error(`Alerts fetch failed: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchAgentStats() {
+  const res = await fetch(`${API_BASE}/agent/stats`);
+  if (!res.ok) throw new Error(`Stats fetch failed: ${res.statusText}`);
+  return res.json();
+}

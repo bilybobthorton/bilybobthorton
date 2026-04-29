@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import get_settings
 from api.routes import health, scan
-from api.routes import auth
+from api.routes import auth, agent, admin
 
 settings = get_settings()
 
@@ -26,3 +26,5 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(scan.router, prefix="/api/v1")
+app.include_router(agent.router)
+app.include_router(admin.router)
