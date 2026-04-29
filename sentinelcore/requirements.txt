@@ -31,7 +31,7 @@ yara-python==4.5.1
 
 # Hashing & Fuzzy Hashing
 ssdeep==3.4
-tlsh==4.7.2
+python-tlsh==4.5.0
 
 # String / Binary Analysis
 capstone==5.0.1

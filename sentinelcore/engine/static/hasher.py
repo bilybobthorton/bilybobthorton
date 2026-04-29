@@ -10,7 +10,7 @@ except ImportError:
     SSDEEP_AVAILABLE = False
 
 try:
-    import tlsh
+    import tlsh  # python-tlsh package
     TLSH_AVAILABLE = True
 except ImportError:
     TLSH_AVAILABLE = False
