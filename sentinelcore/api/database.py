@@ -10,3 +10,12 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=As
 async def get_db() -> AsyncSession:
     async with AsyncSessionLocal() as session:
         yield session
+
+
+# Context manager version for use outside FastAPI dependency injection
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_session():
+    async with AsyncSessionLocal() as session:
+        yield session

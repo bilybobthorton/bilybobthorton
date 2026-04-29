@@ -7,9 +7,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.auth.dependencies import get_current_user_optional
+from api.auth.dependencies import get_current_user, get_current_user_optional
 from api.config import Settings, get_settings
 from api.database import get_db
+from api.middleware.rate_limit import check_and_increment, get_remaining
 from api.models.scan import ScanJob, User
 from api.tasks.scan_tasks import run_scan
 from engine.intel.virustotal import vt_lookup_hash
@@ -25,6 +26,7 @@ class ScanSubmitted(BaseModel):
     scan_id: str
     filename: str
     status: str
+    scans_remaining: int | None = None
 
 
 class ScanResult(BaseModel):
@@ -35,6 +37,9 @@ class ScanResult(BaseModel):
     threat_level: str | None
     confidence: float | None
     indicators: list[str]
+    ml: dict | None = None
+    virustotal: dict | None = None
+    otx: dict | None = None
     error: str | None
 
 
@@ -47,6 +52,9 @@ async def scan_file(
 ):
     if file.size and file.size > settings.max_file_size_mb * 1024 * 1024:
         raise HTTPException(status_code=413, detail=f"File exceeds {settings.max_file_size_mb}MB limit")
+
+    # Enforce tier quota
+    await check_and_increment(current_user)
 
     scan_id = str(uuid.uuid4())
     upload_dir = Path(settings.upload_dir)
@@ -66,10 +74,22 @@ async def scan_file(
     db.add(job)
     await db.commit()
 
-    run_scan.delay(scan_id, str(dest), file.filename or "unknown",
-                   str(current_user.id) if current_user else None)
+    run_scan.delay(
+        scan_id, str(dest), file.filename or "unknown",
+        str(current_user.id) if current_user else None,
+    )
 
-    return ScanSubmitted(scan_id=scan_id, filename=file.filename or "unknown", status="queued")
+    scans_remaining = None
+    if current_user:
+        quota = await get_remaining(current_user)
+        scans_remaining = quota.get("remaining")
+
+    return ScanSubmitted(
+        scan_id=scan_id,
+        filename=file.filename or "unknown",
+        status="queued",
+        scans_remaining=scans_remaining,
+    )
 
 
 @router.get("/{scan_id}", response_model=ScanResult)
@@ -81,10 +101,17 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
 
     indicators = []
     sha256 = None
+    ml_data = None
+    vt_data = None
+    otx_data = None
+
     if job.result_json:
         indicators = job.result_json.get("indicators", [])
         hashes = job.result_json.get("hashes", {})
         sha256 = hashes.get("sha256")
+        ml_data = job.result_json.get("ml")
+        vt_data = job.result_json.get("virustotal")
+        otx_data = job.result_json.get("otx")
 
     return ScanResult(
         scan_id=str(job.id),
@@ -94,6 +121,9 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
         threat_level=job.threat_level,
         confidence=job.confidence,
         indicators=indicators,
+        ml=ml_data,
+        virustotal=vt_data,
+        otx=otx_data,
         error=job.error,
     )
 
@@ -101,8 +131,23 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/hash")
 async def lookup_hash(body: HashLookupRequest):
     vt = await vt_lookup_hash(body.hash)
+    local_hit = body.hash.lower() in _local_bad_hashes()
     return {
         "hash": body.hash,
+        "local_db": {"found": local_hit, "malicious": local_hit},
         "virustotal": vt,
-        "source": "virustotal" if vt else "local_db",
     }
+
+
+@router.get("/quota/me")
+async def my_quota(current_user: User = Depends(get_current_user)):
+    """Return the authenticated user's scan quota status."""
+    return await get_remaining(current_user)
+
+
+def _local_bad_hashes() -> set:
+    try:
+        from engine.intel.hash_db import _KNOWN_BAD
+        return _KNOWN_BAD
+    except Exception:
+        return set()
