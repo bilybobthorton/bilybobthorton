@@ -1,8 +1,7 @@
 # CLAUDE.md — Project Memory Palace
 
-This file is loaded automatically at the start of every Claude Code session.
-It contains everything needed to continue building without re-explaining context.
-Update it after every major session.
+Loaded automatically at the start of every Claude Code session.
+Update after every major session.
 
 ---
 
@@ -12,177 +11,191 @@ Update it after every major session.
 - USMC Cybersecurity (separating ~April 2027)
 - Bachelor's degree in relevant field
 - 5 years hands-on cybersecurity experience
-- Certs: (update this list as you earn/list them)
 - Goal: Build a globally recognized endpoint security company
 
-**Product:** SentinelCore (working name — can change)
+**Product:** SentinelCore
 - Malware detection + analysis platform
-- Target: Consumers, SMBs, and eventually Enterprise
+- Target: Consumers, SMBs, Enterprise
 - Competitor benchmark: Malwarebytes, CrowdStrike Falcon, Carbon Black
-
----
-
-## Business Context
-
-- We are building this as a real, revenue-generating business
-- Stack must be production-quality from day one — no toy code
-- Development timeline: ~12 months while still in USMC, then full-time
-- MVP goal: Working static analysis engine + web dashboard + free/pro tier SaaS
-- Long-term: Real-time agent, behavioral sandbox, threat intel feeds, ML detection
-
----
-
-## Project: SentinelCore
-
-**Repo:** bilybobthorton/bilybobthorton (this will move to a dedicated repo — track that)
-**Dev branch:** claude/malware-detection-app-bRsUv
-**Language stack:**
-- Backend: Python 3.11+ with FastAPI
-- Analysis engine: Python (pefile, yara-python, ssdeep, capstone)
-- ML layer: scikit-learn + PyTorch (future)
-- Frontend: React + Next.js + Tailwind CSS
-- Database: PostgreSQL (primary), Redis (cache + job queue)
-- Task queue: Celery + Redis
-- Container: Docker + Docker Compose
-- CI/CD: GitHub Actions
-- Hosting target: Cloudflare Workers (edge API) + VPS for heavy analysis
-
----
-
-## Architecture Overview
-
-```
-sentinelcore/
-├── engine/              # Core detection engine (Python)
-│   ├── static/          # Static analysis (PE, ELF, strings, entropy, YARA)
-│   ├── dynamic/         # Behavioral analysis (sandbox hooks, process monitoring)
-│   ├── ml/              # ML detection models + inference
-│   ├── intel/           # Threat intelligence (VT API, OTX, MISP, hash DBs)
-│   └── signatures/      # YARA rules, hash lists, IOC feeds
-├── api/                 # FastAPI REST backend
-│   ├── routes/          # Endpoints: scan, report, auth, admin
-│   ├── models/          # SQLAlchemy ORM models
-│   ├── tasks/           # Celery async tasks
-│   └── auth/            # JWT + API key auth
-├── agent/               # Lightweight endpoint agent (future)
-│   ├── windows/         # Windows-specific hooks (minifilter driver — future)
-│   └── linux/           # Linux inotify + fanotify hooks
-├── dashboard/           # Next.js frontend
-│   ├── app/             # App router pages
-│   ├── components/      # UI components
-│   └── lib/             # API client, utils
-├── infra/               # Docker, nginx, deployment configs
-│   ├── docker-compose.yml
-│   └── nginx/
-└── tests/               # Test suite
-    ├── unit/
-    └── integration/
-```
-
----
-
-## Detection Methodology
-
-### Layer 1 — Static Analysis (Fast, no execution)
-1. **Hash matching** — MD5/SHA1/SHA256 vs known-bad databases
-2. **YARA rules** — Pattern matching against file bytes and strings
-3. **PE analysis** — Import tables, section entropy, overlay data, resource anomalies
-4. **String extraction** — URLs, IPs, registry keys, suspicious API calls
-5. **Entropy analysis** — Packed/encrypted sections flagged for further analysis
-6. **Fuzzy hashing** — ssdeep/tlsh for variant detection
-
-### Layer 2 — ML Detection (Medium speed)
-1. Feature extraction from static analysis output
-2. Random forest classifier (baseline)
-3. Deep learning on PE byte sequences (future — MalConv architecture)
-4. Confidence scoring: 0.0–1.0
-
-### Layer 3 — Dynamic/Behavioral (Slow, sandboxed)
-1. Detonation in isolated VM/container
-2. API call sequence monitoring
-3. Network C2 detection
-4. File system + registry change tracking
-5. Memory injection detection
-
-### Layer 4 — Threat Intelligence
-1. VirusTotal API enrichment
-2. AlienVault OTX pulse data
-3. Internal hash reputation DB
-4. MISP threat sharing (enterprise tier)
-
----
-
-## API Design (v1)
-
-```
-POST /api/v1/scan/file          # Upload + scan a file
-GET  /api/v1/scan/{scan_id}     # Get scan results
-POST /api/v1/scan/hash          # Lookup hash reputation
-GET  /api/v1/report/{scan_id}   # Full analysis report
-POST /api/v1/auth/register      # User registration
-POST /api/v1/auth/login         # JWT login
-GET  /api/v1/admin/stats        # Platform stats (admin only)
-```
 
 ---
 
 ## Business Model
 
-| Tier       | Price       | Features |
-|------------|-------------|----------|
-| Free       | $0          | 5 scans/day, basic static analysis, hash lookup |
-| Pro        | $9.99/mo    | Unlimited scans, ML scoring, YARA custom rules, reports |
-| Enterprise | $99+/mo     | API access, behavioral sandbox, threat intel feeds, MISP, SLA |
+| Tier       | Price     | Features |
+|------------|-----------|----------|
+| Free       | $0        | 5 scans/day, static analysis, hash lookup |
+| Pro        | $9.99/mo  | Unlimited scans, ML scoring, custom YARA, endpoint agent |
+| Enterprise | $99+/mo   | API access, sandbox, threat intel, MISP, SLA |
+
+---
+
+## Repo & Branch
+
+**Repo:** bilybobthorton/bilybobthorton (move to dedicated repo eventually)
+**Dev branch:** claude/malware-detection-app-bRsUv
+**Push token:** refresh from user each session (PAT with repo write scope)
+
+---
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Backend API | Python 3.11 + FastAPI + Uvicorn |
+| Analysis engine | pefile, yara-python, ssdeep, capstone, lief |
+| ML | scikit-learn RandomForest (train offline, load pkl) |
+| Task queue | Celery + Redis |
+| Database | PostgreSQL 16 (asyncpg async + psycopg2 sync for Celery) |
+| Auth | JWT Bearer + X-API-Key header |
+| Billing | Stripe (Checkout Sessions, webhooks, Customer Portal) |
+| Endpoint agent | Rust (tokio, notify, sysinfo, reqwest) |
+| Dashboard | Next.js 14 + Tailwind CSS (App Router) |
+| Container | Docker Compose |
+| CI/CD | GitHub Actions |
+
+---
+
+## What Is Built (as of Session 2)
+
+### Python Engine (`sentinelcore/engine/`)
+- `static/hasher.py` — streaming MD5/SHA1/SHA256/ssdeep
+- `static/pe_analyzer.py` — full PE: sections, entropy, imports, exports, overlay, signing, .NET
+- `static/strings_extractor.py` — URLs, IPs, registry keys, suspicious APIs
+- `static/yara_scanner.py` — loads .yar/.yara from signatures/yara/
+- `static/analyzer.py` — orchestrator: type detect → hash → PE → YARA → strings → score
+- `static/models.py` — ThreatLevel, FileType, PEInfo, SectionInfo, YaraMatch, StaticAnalysisResult
+- `intel/virustotal.py` — VirusTotalClient: lookup_hash, lookup_url
+- `intel/otx.py` — OTXClient: lookup_hash, lookup_ip, lookup_domain (AlienVault OTX)
+- `intel/hash_db.py` — in-memory SHA256 blocklist from signatures/malware_hashes.txt
+- `ml/features.py` — 31-feature vector extraction from StaticAnalysisResult
+- `ml/model.py` — MalwareClassifier wrapper (RandomForest pkl, singleton loader)
+- `ml/trainer.py` — offline trainer CLI; --synthetic flag for dev model without real dataset
+- `signatures/yara/suspicious_strings.yar` — 4 starter rules
+- `signatures/malware_hashes.txt` — seed SHA256 blocklist (WannaCry, NotPetya, Emotet, etc.)
+
+### FastAPI Backend (`sentinelcore/api/`)
+- `config.py` — Pydantic Settings (DB, Redis, JWT, VT, OTX, Stripe, ML)
+- `database.py` — async SQLAlchemy engine + session factory
+- `main.py` — FastAPI app, CORS, all routers registered
+- `models/scan.py` — User (with Stripe fields), ScanJob
+- `models/alert.py` — AgentAlert (from Rust agent)
+- `models/yara_rule.py` — YaraRule (custom + built-in)
+- `auth/jwt.py` — hash_password, verify_password, create_access_token, generate_api_key
+- `auth/dependencies.py` — get_current_user (JWT Bearer → X-API-Key fallback)
+- `routes/auth.py` — POST /api/v1/auth/register, /login
+- `routes/scan.py` — POST /api/v1/scan/file, GET /api/v1/scan/{id}, POST /api/v1/scan/hash
+- `routes/agent.py` — POST/GET /api/v1/agent/alert(s), GET /api/v1/agent/stats
+- `routes/admin.py` — GET /api/v1/admin/stats (Enterprise only)
+- `routes/billing.py` — POST checkout/portal/webhook, GET subscription
+- `routes/yara_rules.py` — CRUD /api/v1/yara/rules + POST /validate
+- `routes/ml.py` — GET /api/v1/ml/status, POST /reload, POST /train/synthetic
+- `routes/health.py` — GET /health
+- `tasks/celery_app.py` — Celery instance
+- `tasks/scan_tasks.py` — run_scan task: static → ML → VirusTotal → OTX → write DB
+
+### Alembic Migrations
+- 0001: users + scan_jobs tables
+- 0002: agent_alerts table
+- 0003: yara_rules table + Stripe fields on users
+
+### Rust Endpoint Agent (`sentinelcore/agent/`)
+- `src/main.rs` — CLI (run/quarantine/status), tokio task spawner, fan-out alert channel
+- `src/alert.rs` — Alert struct, Severity, AlertKind enums, builder pattern
+- `src/config.rs` — AgentConfig with platform defaults (watch_dirs, exclude_dirs, quarantine_dir)
+- `src/scanner/hash.rs` — streaming SHA256 + MD5 (64KB chunks)
+- `src/monitor/filesystem.rs` — notify watcher: high-risk extensions, suspicious filenames, temp drops
+- `src/monitor/process.rs` — sysinfo: LOLBAS detection, suspicious parent-child chains
+- `src/monitor/fim.rs` — baseline critical system files, alert on hash drift every 30s
+- `src/monitor/lolbas.rs` — ~35 LOLBin entries with MITRE ATT&CK mappings
+- `src/quarantine.rs` — XOR-obfuscated vault, JSON metadata, restore support
+- `src/reporter.rs` — HTTP POST to API with 4-attempt exponential backoff
+
+### Next.js Dashboard (`sentinelcore/dashboard/`)
+- `/` — hero + drag-drop scan upload + live polling + results
+- `/alerts` — real-time agent alerts (5s refresh), severity cards, detail drawer
+- `/yara` — YARA rule editor with live syntax validation
+- `/billing` — plan comparison + Stripe checkout + portal
+- Nav: Scan | Alerts | YARA | Billing
+
+### Infrastructure
+- `infra/docker-compose.yml` — api, worker, db (postgres:16), redis:7, flower
+- `infra/Dockerfile.api` — python:3.11-slim + libmagic + libfuzzy
+- `.github/workflows/ci.yml` — Python lint/migrate/test, Rust build/clippy, Next.js build
+
+---
+
+## Env Vars (`.env.example`)
+
+```
+DATABASE_URL=postgresql+asyncpg://sentinel:sentinel@db:5432/sentinelcore
+REDIS_URL=redis://redis:6379/0
+SECRET_KEY=...
+JWT_SECRET_KEY=...
+VIRUSTOTAL_API_KEY=     # virustotal.com free tier
+OTX_API_KEY=            # otx.alienvault.com free tier
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_PRO=price_...
+STRIPE_PRICE_ENTERPRISE=price_...
+```
+
+---
+
+## Detection Pipeline (scan_tasks.py)
+
+1. **Static analysis** — PE/YARA/strings/entropy → score 0.0–1.0
+2. **ML model** — 31-feature RandomForest → malice probability; boosts confidence if agrees with static
+3. **VirusTotal** — hash lookup; ≥3 engines = MALICIOUS; auto-caches confirmed hashes
+4. **OTX** — pulse count; ≥3 pulses + clean static = SUSPICIOUS
+
+---
+
+## Running the Dev Model (No Real Dataset)
+
+```bash
+cd sentinelcore
+python -m engine.ml.trainer --synthetic
+# → writes engine/ml/sentinel_rf.pkl
+```
+
+Then call `POST /api/v1/ml/train/synthetic` from the dashboard or curl for online generation.
+
+---
+
+## TODO / Next Up
+
+- [ ] **Tests** — pytest suite for engine + API routes (high priority before public launch)
+- [ ] **Landing page** — marketing site (Next.js or separate static site)
+- [ ] **Deploy MVP** — Docker Compose on DigitalOcean/Hetzner VPS + nginx reverse proxy
+- [ ] **Train real ML model** — grab MalwareBazaar + clean Windows binaries, run trainer.py
+- [ ] **AlienVault OTX IP enrichment** — wire extracted IPs from scan through OTX
+- [ ] **Windows agent packaging** — sign binary, NSIS/WiX installer, register as Windows service
+- [ ] **Scan report PDF** — downloadable full analysis report (Pro+ feature)
+- [ ] **Rate limiting** — enforce free tier 5 scans/day in API middleware
+- [ ] **Email notifications** — alert user when scan finds malware (SendGrid/Resend)
+- [ ] **MISP integration** — enterprise tier threat sharing
+- [ ] **Dedicated repo** — move sentinelcore/ out of bilybobthorton/bilybobthorton
 
 ---
 
 ## Session Log
 
 ### Session 1 — 2026-04-29
-- Created CLAUDE.md (this file)
-- Designed full system architecture
-- Scaffolded project directory structure
-- Created static analysis engine skeleton
-- Created FastAPI backend skeleton
-- Set up Docker Compose environment
-- Next: Fill in static analysis engine logic (pefile parsing, YARA, entropy)
+- Created CLAUDE.md, designed architecture, scaffolded structure
+- Built static analysis engine (PE, YARA, strings, entropy)
+- Built FastAPI backend (auth, scan, Docker Compose, Alembic)
+- Built Next.js dashboard (upload, scan result, threat badge)
+- Added VirusTotal integration
 
----
-
-## Key Decisions Made
-
-1. **Python for engine** — Largest security tooling ecosystem (pefile, yara-python, volatility, etc.)
-2. **FastAPI over Flask/Django** — Async-first, auto OpenAPI docs, Pydantic validation
-3. **Celery + Redis for async** — Heavy scanning jobs run in background workers
-4. **Free tier as lead gen** — Build reputation, drive Pro conversions
-5. **Static analysis first** — Ship fast, add ML + dynamic later
-6. **Docker from day one** — Reproducible dev/prod environments
-
----
-
-## How to Continue a Session
-
-Start each session by saying:
-> "Read CLAUDE.md and continue building SentinelCore. Here's what I want to do today: [your goal]"
-
-Claude will load this file, understand full context, and pick up exactly where we left off.
-
----
-
-## TODO / Roadmap
-
-- [ ] Static analysis engine — pefile parsing (complete basic structure)
-- [ ] YARA rule integration
-- [ ] FastAPI endpoints — /scan/file working end-to-end
-- [ ] PostgreSQL models + Alembic migrations
-- [ ] Celery task queue for async scanning
-- [ ] Basic React dashboard — upload file, show results
-- [ ] Docker Compose full stack working locally
-- [ ] VirusTotal API integration (free tier)
-- [ ] User auth (JWT)
-- [ ] Stripe integration for Pro tier billing
-- [ ] GitHub Actions CI/CD pipeline
-- [ ] Deploy MVP to VPS (DigitalOcean/Hetzner)
-- [ ] ML baseline model (random forest on PE features)
-- [ ] Windows endpoint agent (real-time file scanning)
-- [ ] Landing page + marketing site
+### Session 2 — 2026-04-29
+- Built full Rust endpoint agent (filesystem/process/FIM monitors, LOLBAS DB, quarantine, reporter, CLI)
+- Added agent alert ingestion API + alerts dashboard page
+- Added local hash reputation DB + wired VT into scan pipeline
+- Added GitHub Actions CI (Python + Rust + Next.js)
+- Added Stripe billing (checkout, webhooks, portal, plan UI)
+- Added YARA rule management (CRUD API + live editor UI)
+- Built ML layer: feature extractor (31 features), RandomForest wrapper, offline trainer
+- Added OTX threat intel integration
+- Wired ML + OTX into scan pipeline (4-layer detection)
+- Updated ScanResult UI to show ML score + VT + OTX intel pills
