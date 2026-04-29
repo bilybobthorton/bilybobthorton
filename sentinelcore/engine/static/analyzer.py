@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Main static analysis orchestrator.
 Runs all analysis layers and produces a unified StaticAnalysisResult.

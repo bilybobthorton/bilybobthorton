@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
