@@ -105,7 +105,7 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-5xl px-6 py-10 space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">Plans &amp; Billing</h1>
         <p className="text-slate-500 text-sm mt-1">
