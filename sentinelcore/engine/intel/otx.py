@@ -126,3 +126,10 @@ async def otx_lookup_ip(ip: str) -> Optional[dict]:
     if not client:
         return None
     return await client.lookup_ip(ip)
+
+
+async def otx_lookup_domain(domain: str) -> Optional[dict]:
+    client = _get_client()
+    if not client:
+        return None
+    return await client.lookup_domain(domain)

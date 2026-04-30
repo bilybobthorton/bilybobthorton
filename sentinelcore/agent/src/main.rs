@@ -172,6 +172,15 @@ async fn run_agent(config: Arc<config::AgentConfig>, api_url: String, api_key: S
         }
     });
 
+    // Network connection monitor
+    let net_config = Arc::clone(&config);
+    let net_tx = monitor_tx.clone();
+    tokio::spawn(async move {
+        if let Err(e) = monitor::network::start_monitor(net_config, net_tx).await {
+            error!("Network monitor crashed: {}", e);
+        }
+    });
+
     // Local alert logger (always active)
     let log_rx_clone = log_rx;
     tokio::spawn(async move {

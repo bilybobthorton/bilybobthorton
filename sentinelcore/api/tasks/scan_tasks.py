@@ -14,9 +14,11 @@ from api.config import get_settings
 from api.models.scan import ScanJob, User
 from api.services.email import send_scan_alert
 from api.tasks.celery_app import celery_app
+from urllib.parse import urlparse
+
 from engine.intel import hash_db
 from engine.intel.virustotal import VirusTotalClient
-from engine.intel.otx import otx_lookup_hash, otx_lookup_ip
+from engine.intel.otx import otx_lookup_hash, otx_lookup_ip, otx_lookup_domain
 from engine.ml.features import extract_features
 from engine.ml.model import get_model
 from engine.static.analyzer import analyze_file
@@ -183,6 +185,73 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                 except Exception as e:
                     logger.warning("OTX IP lookup failed for %s: %s", ip, e)
 
+        # ── Layer 4c: URL / domain reputation ────────────────────────────────
+        # Check domains extracted from file strings against OTX.
+        # Check URLs against VirusTotal URL scanner.
+        # Limit to 5 of each to respect rate limits.
+        network_ioc_hits: list[dict] = []
+        if result.strings:
+            # Deduplicate domains from extracted URLs
+            seen_domains: set[str] = set()
+            candidate_domains: list[str] = []
+            for url in result.strings.urls[:10]:
+                try:
+                    host = urlparse(url).hostname or ""
+                    if host and host not in seen_domains and not host.replace(".", "").isdigit():
+                        seen_domains.add(host)
+                        candidate_domains.append(host)
+                except Exception:
+                    pass
+            candidate_domains = candidate_domains[:5]
+
+            if settings.otx_api_key:
+                for domain in candidate_domains:
+                    try:
+                        dom_result = _run_async(otx_lookup_domain(domain))
+                        if dom_result and dom_result.get("found"):
+                            pulse_count = dom_result.get("pulse_count", 0)
+                            indicators.append(
+                                f"OTX: domain {domain} seen in {pulse_count} threat pulse(s)"
+                            )
+                            network_ioc_hits.append(dom_result)
+                            if pulse_count >= 2 and result.threat_level == ThreatLevel.CLEAN:
+                                result = dataclasses.replace(
+                                    result,
+                                    threat_level=ThreatLevel.SUSPICIOUS,
+                                    confidence=max(result.confidence, 0.45),
+                                )
+                    except Exception as e:
+                        logger.warning("OTX domain lookup failed for %s: %s", domain, e)
+
+            if settings.virustotal_api_key:
+                vt_client_url = VirusTotalClient(settings.virustotal_api_key)
+                for url in result.strings.urls[:5]:
+                    try:
+                        url_result = _run_async(vt_client_url.lookup_url(url))
+                        if url_result and url_result.get("found"):
+                            mal = url_result.get("malicious", 0)
+                            sus = url_result.get("suspicious", 0)
+                            if mal > 0 or sus > 0:
+                                total = url_result.get("total_engines", 1)
+                                indicators.insert(
+                                    0, f"VirusTotal URL: {url} flagged by {mal + sus}/{total} engines"
+                                )
+                                network_ioc_hits.append({**url_result, "type": "url"})
+                                if mal >= 2:
+                                    result = dataclasses.replace(
+                                        result,
+                                        threat_level=ThreatLevel.MALICIOUS,
+                                        confidence=max(result.confidence, 0.75),
+                                    )
+                                elif sus >= 2 and result.threat_level == ThreatLevel.CLEAN:
+                                    result = dataclasses.replace(
+                                        result,
+                                        threat_level=ThreatLevel.SUSPICIOUS,
+                                        confidence=max(result.confidence, 0.4),
+                                    )
+                    except Exception as e:
+                        logger.warning("VT URL lookup failed for %s: %s", url, e)
+
         # ── Build final result ────────────────────────────────────────────────
         result_dict = json.loads(json.dumps(dataclasses.asdict(result), default=_serialize))
         result_dict["indicators"] = indicators
@@ -190,10 +259,11 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
             result_dict["ml"] = ml_result
         if vt_data:
             result_dict["virustotal"] = vt_data
-        if otx_data or otx_ip_hits:
+        if otx_data or otx_ip_hits or network_ioc_hits:
             result_dict["otx"] = {
                 **(otx_data or {}),
                 "ip_hits": otx_ip_hits,
+                "network_iocs": network_ioc_hits,
             }
 
         with _get_session() as db:

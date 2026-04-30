@@ -29,6 +29,9 @@ pub enum AlertKind {
     CriticalFileDeleted,
     // Threat intel
     KnownMaliciousHash,
+    // Network
+    C2ConnectionDetected,
+    SuspiciousNetworkActivity,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
