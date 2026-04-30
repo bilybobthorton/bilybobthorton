@@ -7,15 +7,16 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import create_engine, update
+from sqlalchemy import create_engine, update, select
 from sqlalchemy.orm import Session
 
 from api.config import get_settings
-from api.models.scan import ScanJob
+from api.models.scan import ScanJob, User
+from api.services.email import send_scan_alert
 from api.tasks.celery_app import celery_app
 from engine.intel import hash_db
 from engine.intel.virustotal import VirusTotalClient
-from engine.intel.otx import otx_lookup_hash
+from engine.intel.otx import otx_lookup_hash, otx_lookup_ip
 from engine.ml.features import extract_features
 from engine.ml.model import get_model
 from engine.static.analyzer import analyze_file
@@ -49,6 +50,15 @@ def _run_async(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
+
+
+def _get_user_email(user_id: str) -> str | None:
+    try:
+        with _get_session() as db:
+            row = db.execute(select(User).where(User.id == uuid.UUID(user_id))).scalar_one_or_none()
+            return row.email if row else None
+    except Exception:
+        return None
 
 
 @celery_app.task(bind=True, name="scan_tasks.run_scan", max_retries=2)
@@ -85,7 +95,6 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                     "threshold": model.threshold,
                 }
                 if ml_prob >= model.threshold and result.threat_level == ThreatLevel.CLEAN:
-                    # ML flags it but static analysis didn't — treat as suspicious
                     result = dataclasses.replace(
                         result,
                         threat_level=ThreatLevel.SUSPICIOUS,
@@ -93,7 +102,6 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                     )
                     indicators.append(f"ML model: {ml_prob:.1%} malice probability")
                 elif ml_prob >= model.threshold:
-                    # Boost confidence when ML agrees with static
                     new_conf = min(1.0, (result.confidence + ml_prob) / 2 + 0.1)
                     result = dataclasses.replace(result, confidence=new_conf)
                     indicators.append(f"ML model confirms: {ml_prob:.1%} malice probability")
@@ -124,7 +132,7 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
             except Exception as e:
                 logger.warning("VirusTotal lookup failed: %s", e)
 
-        # ── Layer 4: OTX enrichment ───────────────────────────────────────────
+        # ── Layer 4: OTX hash enrichment ──────────────────────────────────────
         otx_data: dict = {}
         if settings.otx_api_key:
             try:
@@ -142,7 +150,38 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                             confidence=max(result.confidence, 0.4),
                         )
             except Exception as e:
-                logger.warning("OTX lookup failed: %s", e)
+                logger.warning("OTX hash lookup failed: %s", e)
+
+        # ── Layer 4b: OTX IP enrichment ───────────────────────────────────────
+        # Check IPs extracted from the file against OTX threat intel.
+        # Limit to 5 IPs to respect rate limits; skip RFC-1918 addresses.
+        otx_ip_hits: list[dict] = []
+        if settings.otx_api_key and result.strings:
+            _private_prefixes = ("10.", "192.168.", "127.", "172.")
+            candidate_ips = [
+                ip for ip in result.strings.ips
+                if not any(ip.startswith(p) for p in _private_prefixes)
+            ][:5]
+            for ip in candidate_ips:
+                try:
+                    ip_result = _run_async(otx_lookup_ip(ip))
+                    if ip_result and ip_result.get("found"):
+                        pulse_count = ip_result.get("pulse_count", 0)
+                        country = ip_result.get("country", "")
+                        country_str = f" ({country})" if country else ""
+                        indicators.append(
+                            f"OTX: IP {ip}{country_str} seen in {pulse_count} threat pulse(s)"
+                        )
+                        otx_ip_hits.append(ip_result)
+                        # Escalate threat level if a contacted IP is known-bad
+                        if pulse_count >= 2 and result.threat_level == ThreatLevel.CLEAN:
+                            result = dataclasses.replace(
+                                result,
+                                threat_level=ThreatLevel.SUSPICIOUS,
+                                confidence=max(result.confidence, 0.35),
+                            )
+                except Exception as e:
+                    logger.warning("OTX IP lookup failed for %s: %s", ip, e)
 
         # ── Build final result ────────────────────────────────────────────────
         result_dict = json.loads(json.dumps(dataclasses.asdict(result), default=_serialize))
@@ -151,8 +190,11 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
             result_dict["ml"] = ml_result
         if vt_data:
             result_dict["virustotal"] = vt_data
-        if otx_data:
-            result_dict["otx"] = otx_data
+        if otx_data or otx_ip_hits:
+            result_dict["otx"] = {
+                **(otx_data or {}),
+                "ip_hits": otx_ip_hits,
+            }
 
         with _get_session() as db:
             db.execute(
@@ -165,6 +207,25 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                 )
             )
             db.commit()
+
+        # ── Email notification ────────────────────────────────────────────────
+        # Send alert to the scanning user if the file is malicious or suspicious.
+        if user_id and settings.resend_api_key and result.threat_level in (
+            ThreatLevel.MALICIOUS, ThreatLevel.SUSPICIOUS
+        ):
+            user_email = _get_user_email(user_id)
+            if user_email:
+                _run_async(send_scan_alert(
+                    to_email=user_email,
+                    filename=filename,
+                    scan_id=scan_id,
+                    threat_level=result.threat_level.value,
+                    confidence=result.confidence,
+                    indicators=indicators,
+                    base_url=settings.app_base_url,
+                    api_key=settings.resend_api_key,
+                    from_email=settings.email_from,
+                ))
 
     except Exception as exc:
         with _get_session() as db:

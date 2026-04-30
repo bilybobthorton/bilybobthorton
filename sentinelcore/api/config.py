@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     virustotal_api_key: str = ""
     otx_api_key: str = ""
 
+    # Email notifications (Resend — resend.com, free tier 3k/mo)
+    resend_api_key: str = ""
+    email_from: str = "SentinelCore <alerts@sentinelcore.io>"
+    app_base_url: str = "http://localhost:3000"
+
     # Stripe billing
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
