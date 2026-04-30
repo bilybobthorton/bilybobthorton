@@ -112,7 +112,28 @@ export function ScanResult({ result }: { result: ExtendedScanResult }) {
         </p>
       )}
 
-      <p className="text-xs text-slate-600">Scan ID: {result.scan_id}</p>
+      <div className="flex items-center justify-between pt-1">
+        <p className="text-xs text-slate-600">Scan ID: {result.scan_id}</p>
+        {result.status === "complete" && (
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/v1/report/${result.scan_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              View report
+            </a>
+            <span className="text-slate-700">·</span>
+            <a
+              href={`/api/v1/report/${result.scan_id}/pdf`}
+              className="inline-flex items-center gap-1 text-xs rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2 py-1 text-slate-300 transition-colors"
+            >
+              ↓ PDF
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

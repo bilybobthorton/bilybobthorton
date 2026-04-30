@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import get_settings
 from api.routes import health, scan
-from api.routes import auth, agent, admin, billing, yara_rules, ml, report
+from api.routes import auth, agent, admin, billing, yara_rules, ml, report, enterprise
 
 settings = get_settings()
 
@@ -32,3 +32,4 @@ app.include_router(billing.router)
 app.include_router(yara_rules.router)
 app.include_router(ml.router)
 app.include_router(report.router)
+app.include_router(enterprise.router)

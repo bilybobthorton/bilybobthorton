@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     email_from: str = "SentinelCore <alerts@sentinelcore.io>"
     app_base_url: str = "http://localhost:3000"
 
+    # MISP integration — Enterprise tier
+    misp_url: str = ""
+    misp_key: str = ""
+    misp_verify_ssl: bool = True
+
     # Stripe billing
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

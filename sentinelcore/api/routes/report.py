@@ -1,13 +1,13 @@
 """
 Scan report generation — Pro+ feature.
-Returns a structured JSON report or a rendered HTML report
-that the browser can print-to-PDF.
+HTML report for browser viewing; PDF download via WeasyPrint.
 """
+from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,13 +44,47 @@ async def report_html(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(_require_pro),
 ):
-    """
-    Rendered HTML report — open in browser and use File → Print → Save as PDF.
-    Styled for clean A4/Letter output.
-    """
+    """Rendered HTML report — dark-themed, viewable in browser."""
     job = await _get_job(scan_id, db)
     report = _build_report_dict(job, current_user)
     return HTMLResponse(content=_render_html(report))
+
+
+@router.get("/{scan_id}/pdf")
+async def report_pdf(
+    scan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(_require_pro),
+):
+    """
+    Download a PDF scan report (Pro+ feature).
+    Uses WeasyPrint to render the print-optimised HTML template to PDF.
+    """
+    try:
+        from weasyprint import HTML as WeasyprintHTML
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="PDF generation unavailable — WeasyPrint not installed on this server.",
+        )
+
+    job = await _get_job(scan_id, db)
+    report = _build_report_dict(job, current_user)
+    html_content = _render_pdf_html(report)
+
+    try:
+        pdf_bytes = WeasyprintHTML(string=html_content).write_pdf()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
+
+    safe_name = job.filename.replace(" ", "_").replace("/", "_")[:60]
+    filename = f"SentinelCore-Report-{safe_name}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -302,6 +336,170 @@ def _render_html(r: dict) -> str:
   <footer>
     <span>SentinelCore — Malware Detection Platform</span>
     <span>Scan completed: {r.get("scan_completed_at","")[:19].replace("T"," ") if r.get("scan_completed_at") else "—"} UTC</span>
+  </footer>
+</div>
+</body>
+</html>"""
+
+
+def _render_pdf_html(r: dict) -> str:
+    """Light-themed, print-optimised HTML for WeasyPrint PDF generation."""
+    verdict = r["verdict"]
+    f = r["file"]
+    hashes = r["hashes"]
+    pe = r["pe_analysis"]
+    intel = r["intelligence"]
+    vt = intel.get("virustotal") or {}
+    otx = intel.get("otx") or {}
+    ml = intel.get("ml") or {}
+
+    threat_color = {
+        "malicious": "#dc2626",
+        "suspicious": "#d97706",
+        "clean": "#16a34a",
+    }.get(verdict["threat_level"] or "unknown", "#6b7280")
+
+    def rows(items: list[str], style: str = "") -> str:
+        return "".join(
+            f'<tr><td style="{style}">&#x26A0;&nbsp;{item}</td></tr>' for item in items
+        ) or '<tr><td style="color:#6b7280;">None detected</td></tr>'
+
+    def hash_row(label: str, value: str | None) -> str:
+        if not value:
+            return ""
+        return f'<tr><td style="font-weight:600;width:80px;">{label}</td><td style="font-family:monospace;font-size:10px;word-break:break-all;">{value}</td></tr>'
+
+    intel_rows = ""
+    if ml:
+        status = "MALICIOUS" if ml.get("malicious") else "CLEAN"
+        intel_rows += f'<tr><td>ML Score</td><td>{ml.get("score", 0)*100:.1f}% ({status})</td></tr>'
+    if vt.get("found"):
+        mal = vt.get("malicious", 0)
+        total = vt.get("total_engines", 0)
+        label = vt.get("popular_threat_name", "")
+        intel_rows += f'<tr><td>VirusTotal</td><td>{mal}/{total} engines{" — " + label if label else ""}</td></tr>'
+    if otx.get("found"):
+        families = ", ".join(otx.get("malware_families", [])) or "—"
+        intel_rows += f'<tr><td>AlienVault OTX</td><td>{otx.get("pulse_count", 0)} pulse(s) · {families}</td></tr>'
+
+    pe_section = ""
+    if pe.get("is_pe"):
+        section_rows = "".join(
+            f'<tr><td>{s.get("name","")}</td><td style="text-align:center;">{s.get("entropy",0):.2f}</td>'
+            f'<td>{", ".join(s.get("flags",[]))}</td><td style="text-align:right;">{s.get("raw_size",0):,}</td></tr>'
+            for s in pe.get("sections", [])
+        )
+        pe_section = f"""
+        <h2>PE Analysis</h2>
+        <table>
+          <tr><th>Property</th><th>Value</th></tr>
+          <tr><td>Architecture</td><td>{"64-bit" if pe.get("is_64bit") else "32-bit"}</td></tr>
+          <tr><td>Packed</td><td>{"Yes ⚠" if pe.get("is_packed") else "No"}</td></tr>
+          <tr><td>Signed</td><td>{"Yes ✓" if pe.get("is_signed") else "No"}</td></tr>
+          <tr><td>Overlay</td><td>{"Yes — " + str(pe.get("overlay_size",0)) + " bytes" if pe.get("has_overlay") else "None"}</td></tr>
+          <tr><td>Import DLLs</td><td>{pe.get("import_dll_count", 0)}</td></tr>
+        </table>
+        <h3 style="font-size:11px;margin:12px 0 6px;">Sections</h3>
+        <table>
+          <tr><th>Name</th><th>Entropy</th><th>Flags</th><th>Raw Size</th></tr>
+          {section_rows}
+        </table>"""
+
+    yara_rows = "".join(
+        f'<tr><td>&#x2713;&nbsp;{m.get("rule_name","")}</td>'
+        f'<td style="color:#6b7280;">{m.get("meta",{}).get("description","")}</td></tr>'
+        for m in r.get("yara_matches", [])
+    ) or '<tr><td colspan="2" style="color:#6b7280;">No YARA matches</td></tr>'
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SentinelCore Report — {f["name"]}</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.5; background: white; }}
+  .page {{ padding: 32px 40px; }}
+  header {{ display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #dc2626; padding-bottom: 12px; margin-bottom: 20px; }}
+  .logo {{ font-size: 18px; font-weight: 700; color: #dc2626; }}
+  .logo span {{ color: #1e293b; font-weight: 400; font-size: 13px; }}
+  .meta {{ font-size: 10px; color: #64748b; text-align: right; }}
+  .verdict-box {{ border-left: 4px solid {threat_color}; background: #f8fafc; padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }}
+  .verdict-label {{ font-size: 22px; font-weight: 700; color: {threat_color}; text-transform: uppercase; }}
+  .confidence {{ font-size: 11px; color: #64748b; text-align: right; }}
+  .confidence span {{ font-size: 24px; font-weight: 700; color: #1e293b; }}
+  h2 {{ font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 16px 0 8px; }}
+  h3 {{ font-size: 10px; color: #64748b; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 8px; }}
+  th {{ text-align: left; background: #f1f5f9; color: #475569; font-size: 10px; padding: 5px 8px; border: 1px solid #e2e8f0; }}
+  td {{ padding: 4px 8px; border: 1px solid #e2e8f0; vertical-align: top; }}
+  tr:nth-child(even) td {{ background: #f8fafc; }}
+  .grid2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }}
+  .field {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; }}
+  .field-label {{ font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: #94a3b8; }}
+  .field-value {{ font-family: monospace; font-size: 10px; word-break: break-all; }}
+  footer {{ margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; display: flex; justify-content: space-between; }}
+  @page {{ margin: 0; size: A4; }}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div class="logo">SentinelCore <span>Malware Analysis Report</span></div>
+    <div class="meta">
+      <div>Report v{r["report_version"]} · Generated {r["generated_at"][:10]}</div>
+      <div>Analyst: {r["analyst"]}</div>
+      <div>Scan ID: {r["scan_id"][:18]}…</div>
+    </div>
+  </header>
+
+  <div class="verdict-box">
+    <div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">VERDICT</div>
+      <div class="verdict-label">{verdict["threat_level"] or "unknown"}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px;">{len(verdict["indicators"])} indicator(s) detected</div>
+    </div>
+    <div class="confidence">
+      <span>{round((verdict["confidence"] or 0)*100)}%</span><br>confidence
+    </div>
+  </div>
+
+  <h2>File Information</h2>
+  <div class="grid2">
+    <div class="field"><div class="field-label">Filename</div><div class="field-value">{f["name"]}</div></div>
+    <div class="field"><div class="field-label">Size</div><div class="field-value">{f["size_bytes"]:,} bytes</div></div>
+    <div class="field"><div class="field-label">Type / MIME</div><div class="field-value">{f["type"]} / {f["mime_type"]}</div></div>
+    <div class="field"><div class="field-label">Completed</div><div class="field-value">{(r.get("scan_completed_at") or "")[:19].replace("T"," ")} UTC</div></div>
+  </div>
+
+  <h2>Cryptographic Hashes</h2>
+  <table>
+    {hash_row("MD5", hashes.get("md5"))}
+    {hash_row("SHA-1", hashes.get("sha1"))}
+    {hash_row("SHA-256", hashes.get("sha256"))}
+    {hash_row("ssdeep", hashes.get("ssdeep"))}
+  </table>
+
+  <h2>Threat Intelligence</h2>
+  <table>
+    <tr><th>Source</th><th>Finding</th></tr>
+    {intel_rows if intel_rows else '<tr><td colspan="2" style="color:#94a3b8;">No threat intelligence hits</td></tr>'}
+  </table>
+
+  <h2>Indicators of Compromise ({len(verdict["indicators"])})</h2>
+  <table><tbody>{rows(verdict["indicators"])}</tbody></table>
+
+  <h2>YARA Matches</h2>
+  <table>
+    <tr><th>Rule</th><th>Description</th></tr>
+    {yara_rows}
+  </table>
+
+  {pe_section}
+
+  <footer>
+    <span>SentinelCore — Confidential Analysis Report</span>
+    <span>Generated {r["generated_at"][:19].replace("T"," ")} UTC</span>
   </footer>
 </div>
 </body>
