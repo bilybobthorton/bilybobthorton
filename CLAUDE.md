@@ -22,11 +22,22 @@ Update after every major session.
 
 ## Business Model
 
+### SentinelCore (Antivirus / Malware Detection)
 | Tier       | Price     | Features |
 |------------|-----------|----------|
 | Free       | $0        | 5 scans/day, static analysis, hash lookup |
 | Pro        | $9.99/mo  | Unlimited scans, ML scoring, custom YARA, endpoint agent, PDF reports |
 | Enterprise | $99+/mo   | API access, MISP integration, network IOC enrichment, SLA |
+
+### SentinelVPN
+| Tier           | Price      | Features |
+|----------------|------------|----------|
+| VPN Free       | $0         | 1 location (US East), 10 GB/mo, 1 device |
+| VPN Pro        | $4.99/mo   | All locations, unlimited bandwidth, 5 devices, kill switch |
+| Security Bundle | $12.99/mo | VPN Pro + SentinelCore Pro — full-stack defense, 30% off vs separate |
+| Enterprise     | Custom     | Dedicated nodes, SIEM/MISP, policy management, 99.9% SLA |
+
+**Strategy:** Use SentinelCore (antivirus) as the acquisition channel, upsell to the Security Bundle. Same playbook as NordSecurity (Nord Threat Protection), Bitdefender Total Security, Norton 360. VPN market is 10× larger than standalone AV.
 
 ---
 
@@ -59,15 +70,16 @@ Update after every major session.
 
 ---
 
-## What Is Built (as of Session 3)
+## What Is Built (as of Session 4)
 
 ### Python Engine (`sentinelcore/engine/`)
 - `static/hasher.py` — streaming MD5/SHA1/SHA256/ssdeep
 - `static/pe_analyzer.py` — full PE: sections, entropy, imports, exports, overlay, signing, .NET
 - `static/strings_extractor.py` — URLs, IPs, registry keys, suspicious APIs
 - `static/yara_scanner.py` — loads .yar/.yara from signatures/yara/
-- `static/analyzer.py` — orchestrator: type detect → hash → PE → YARA → strings → score
-- `static/models.py` — ThreatLevel, FileType, PEInfo, SectionInfo, YaraMatch, StaticAnalysisResult
+- `static/analyzer.py` — orchestrator: type detect → hash → PE → YARA → strings → heuristics → score
+- `static/heuristics.py` — heuristic engine: 15+ API combination rules (injection, ransomware, keylogger, LSASS dump, DPAPI, persistence, anti-debug), structural PE rules (EP anomaly, high-entropy exec section, large overlay, tiny PE, anomalous section names), string rules (VM evasion, sandbox detection, credential harvesting, exfil endpoints, base64 blobs, hardcoded IPs); each hit tagged with MITRE ATT&CK technique + tactic
+- `static/models.py` — ThreatLevel, FileType, PEInfo, SectionInfo, YaraMatch, StaticAnalysisResult, HeuristicHit, HeuristicResult
 - `intel/virustotal.py` — VirusTotalClient: lookup_hash, lookup_url
 - `intel/otx.py` — OTXClient: lookup_hash, lookup_ip, lookup_domain + top-level helper fns
 - `intel/hash_db.py` — in-memory SHA256 blocklist from signatures/malware_hashes.txt
@@ -134,12 +146,13 @@ Email alert fires after scan if MALICIOUS or SUSPICIOUS and user has RESEND_API_
 - `install/windows/build-windows.sh` — cross-compile helper (cross/Docker or mingw-w64)
 
 ### Next.js Dashboard (`sentinelcore/dashboard/`)
-- `/` — marketing landing page: hero, stats bar, 4-layer detection cards, features grid, how-it-works, pricing (Free/Pro/Enterprise), final CTA
-- `/scan` — drag-drop file upload, live polling, scan result with threat badge, ML/VT/OTX pills, "View report" + "↓ PDF" buttons
+- `/` — marketing landing page: hero, stats bar, 4-layer detection cards, features grid, how-it-works, pricing (Free/Pro/Enterprise), VPN teaser banner, final CTA
+- `/scan` — drag-drop file upload, live polling, scan result with threat badge, ML/VT/OTX/Heuristics pills, heuristic hit cards with MITRE tags, "View report" + "↓ PDF" buttons
 - `/alerts` — real-time agent alerts (5s refresh), severity cards, detail drawer
 - `/yara` — YARA rule editor with live syntax validation
 - `/billing` — plan comparison + Stripe checkout + portal
-- Nav: sticky with backdrop-blur, Login + "Get started free" CTA, footer
+- `/vpn` — SentinelVPN landing page: hero, AV vs VPN coverage table, 6 feature cards, pricing (VPN Free/Pro/Bundle/Enterprise), CTA
+- Nav: sticky with backdrop-blur, VPN link (indigo), AuthNav (avatar dropdown or Log in / Get started CTA), footer
 
 ### Infrastructure
 - `infra/docker-compose.yml` — dev stack (api, worker, db, redis, nginx, flower, migrate)
@@ -231,6 +244,14 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - [ ] **macOS agent** — extend Rust agent for macOS (FSEvents, Endpoint Security Framework)
 - [ ] **Windows agent signing** — code-sign the binary for SmartScreen/AV compatibility
 
+### SentinelVPN (infrastructure)
+- [ ] **WireGuard server provisioning** — DigitalOcean droplets per region, wg0 config generation per user
+- [ ] **VPN user management API** — generate WireGuard keypairs, store public key in DB, serve config file download
+- [ ] **VPN client apps** — package WireGuard configs into platform-specific apps (Windows/macOS installer, iOS/Android profile)
+- [ ] **Threat-aware DNS resolver** — block known C2 domains at the DNS layer using SentinelCore's IOC feed
+- [ ] **Bandwidth metering** — track per-user usage against tier limits (free = 10 GB/mo)
+- [ ] **VPN kill switch** — iptables/nftables rule generation for Linux; per-platform instructions for Windows/macOS
+
 ### Growth / business
 - [ ] **Email verification** — verify email on register (Resend already wired in)
 - [ ] **Scan history UI** — /history page showing past scans per user
@@ -283,3 +304,13 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Created AuthNav component: avatar initial + dropdown (Dashboard/Billing/Settings/Sign out); unauthenticated state shows Log in + Get started CTA
 - Settings page: shows email, API key with copy button, sign out
 - Wired auth headers into all api.ts fetch calls (submitScan, pollScan, lookupHash, fetchAlerts, fetchAgentStats)
+
+### Session 5 — 2026-05-01
+- Built heuristic analysis engine (`engine/static/heuristics.py`): 15+ API combination rules (process injection T1055, process hollowing T1055.012, DLL injection T1055.001, keylogger T1056.001, ransomware T1486, downloader T1105, LSASS dump T1003.001, DPAPI T1555, anti-debug T1622, registry persistence T1547.001, token escalation T1134, memory alloc+exec T1620); structural PE rules (EP outside .text, high-entropy exec sections, large overlay, tiny PE, anomalous section names); string rules (VM/sandbox evasion T1497.001, credential harvesting T1555, exfil endpoints T1567, base64 blobs T1027, hardcoded IPs T1071)
+- Added HeuristicHit + HeuristicResult dataclasses to models.py; StaticAnalysisResult now carries `heuristics` field
+- Wired heuristics into analyzer.py (runs after base scoring, escalates threat level)
+- Surfaced heuristics in scan_tasks.py result_dict as top-level key with full hit details
+- Updated ScanResult.tsx: heuristic pill in intel row + expandable hit cards with MITRE technique badges, severity-colored borders, evidence snippets
+- Built SentinelVPN product (`/vpn` page): hero, AV-vs-VPN coverage comparison table, 6 feature cards (WireGuard, zero-log, threat-aware routing, kill switch, DNS leak protection, global servers), 4-tier pricing (Free/Pro/Bundle/Enterprise), CTA
+- Added VPN teaser banner to main landing page (indigo accent, bundle pitch, links to /vpn)
+- Added VPN nav link (indigo color, distinct from main nav items)

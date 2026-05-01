@@ -14,6 +14,7 @@ except ImportError:
     MAGIC_AVAILABLE = False
 
 from .hasher import compute_hashes
+from .heuristics import run_heuristics
 from .models import FileType, StaticAnalysisResult, ThreatLevel
 from .pe_analyzer import analyze_pe, get_suspicious_imports
 from .strings_extractor import extract_strings
@@ -149,6 +150,23 @@ def analyze_file(file_path: str | Path) -> StaticAnalysisResult:
         file_type, pe_info, yara_matches, strings_result, suspicious_imports
     )
 
+    # Heuristic analysis — runs after base scoring so we can escalate
+    heuristic_result = None
+    try:
+        heuristic_result = run_heuristics(pe_info, strings_result, file_size)
+        if heuristic_result.hits:
+            indicators.extend(heuristic_result.indicators)
+            # Escalate threat level based on heuristic verdict
+            if heuristic_result.verdict == "malicious" and threat_level == ThreatLevel.CLEAN:
+                threat_level = ThreatLevel.SUSPICIOUS
+                confidence = max(confidence, heuristic_result.score * 0.85)
+            elif heuristic_result.verdict in ("malicious", "suspicious"):
+                if threat_level == ThreatLevel.CLEAN:
+                    threat_level = ThreatLevel.SUSPICIOUS
+                confidence = min(1.0, confidence + heuristic_result.score * 0.3)
+    except Exception as e:
+        errors.append(f"Heuristic analysis error: {e}")
+
     return StaticAnalysisResult(
         file_path=str(path),
         file_size=file_size,
@@ -162,4 +180,5 @@ def analyze_file(file_path: str | Path) -> StaticAnalysisResult:
         strings=strings_result,
         indicators=indicators,
         errors=errors,
+        heuristics=heuristic_result,
     )

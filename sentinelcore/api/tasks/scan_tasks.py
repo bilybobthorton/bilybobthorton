@@ -265,6 +265,24 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                 "ip_hits": otx_ip_hits,
                 "network_iocs": network_ioc_hits,
             }
+        # Surface heuristic hits as a top-level key for easy UI consumption
+        if result.heuristics and result.heuristics.hits:
+            result_dict["heuristics"] = {
+                "score": result.heuristics.score,
+                "verdict": result.heuristics.verdict,
+                "hits": [
+                    {
+                        "name": h.name,
+                        "severity": h.severity,
+                        "confidence": h.confidence,
+                        "evidence": h.evidence,
+                        "mitre_technique": h.mitre_technique,
+                        "mitre_tactic": h.mitre_tactic,
+                        "description": h.description,
+                    }
+                    for h in result.heuristics.hits
+                ],
+            }
 
         with _get_session() as db:
             db.execute(

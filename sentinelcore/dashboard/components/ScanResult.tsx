@@ -1,19 +1,38 @@
 "use client";
 import { ScanResult as ScanResultType } from "@/lib/api";
 import { ThreatBadge } from "./ThreatBadge";
-import { ShieldCheck, ShieldAlert, AlertTriangle, Hash, Brain, Globe } from "lucide-react";
+import { ShieldCheck, ShieldAlert, AlertTriangle, Hash, Brain, Globe, Microscope } from "lucide-react";
+
+interface HeuristicHit {
+  name: string;
+  severity: string;
+  confidence: number;
+  evidence: string[];
+  mitre_technique: string | null;
+  mitre_tactic: string | null;
+  description: string;
+}
 
 interface ExtendedScanResult extends ScanResultType {
   ml?: { score: number; malicious: boolean; threshold: number };
   virustotal?: { found: boolean; malicious: number; total_engines: number; popular_threat_name?: string; vt_link?: string };
   otx?: { found: boolean; pulse_count: number; malware_families?: string[]; tags?: string[]; otx_link?: string };
+  heuristics?: { score: number; verdict: string; hits: HeuristicHit[] };
 }
+
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: "bg-red-900/40 border-red-600 text-red-300",
+  high:     "bg-orange-900/30 border-orange-600 text-orange-300",
+  medium:   "bg-yellow-900/30 border-yellow-600 text-yellow-300",
+  low:      "bg-slate-800 border-slate-600 text-slate-400",
+};
 
 export function ScanResult({ result }: { result: ExtendedScanResult }) {
   const pct = result.confidence != null ? Math.round(result.confidence * 100) : null;
   const ml = result.ml;
   const vt = result.virustotal;
   const otx = result.otx;
+  const heuristics = result.heuristics;
 
   return (
     <div className="rounded-xl border border-slate-800 bg-[#0d0d14] p-6 space-y-5">
@@ -40,8 +59,20 @@ export function ScanResult({ result }: { result: ExtendedScanResult }) {
       )}
 
       {/* Intelligence layer pills */}
-      {(ml || vt || otx) && (
+      {(ml || vt || otx || heuristics) && (
         <div className="flex flex-wrap gap-2">
+          {heuristics && heuristics.hits.length > 0 && (
+            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
+              heuristics.verdict === "malicious"
+                ? "bg-red-900/30 border-red-700 text-red-300"
+                : heuristics.verdict === "suspicious"
+                ? "bg-orange-900/30 border-orange-700 text-orange-300"
+                : "bg-slate-800 border-slate-700 text-slate-400"
+            }`}>
+              <Microscope size={11} />
+              Heuristics: {heuristics.hits.length} hit{heuristics.hits.length !== 1 ? "s" : ""}
+            </div>
+          )}
           {ml && (
             <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
               ml.malicious
@@ -80,6 +111,41 @@ export function ScanResult({ result }: { result: ExtendedScanResult }) {
               {otx.malware_families?.length ? ` · ${otx.malware_families[0]}` : ""}
             </a>
           )}
+        </div>
+      )}
+
+      {/* Heuristic hits */}
+      {heuristics && heuristics.hits.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Microscope size={13} className="text-purple-400" />
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Heuristic Analysis ({heuristics.hits.length} rule{heuristics.hits.length !== 1 ? "s" : ""} matched)
+            </p>
+          </div>
+          <div className="space-y-2">
+            {heuristics.hits.map((h, i) => (
+              <div key={i} className={`rounded-lg border px-3 py-2.5 ${SEVERITY_STYLES[h.severity] ?? SEVERITY_STYLES.low}`}>
+                <div className="flex items-start justify-between gap-2 mb-0.5">
+                  <p className="text-xs font-semibold">{h.name}</p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {h.mitre_technique && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/30 border border-current opacity-70">
+                        {h.mitre_technique}
+                      </span>
+                    )}
+                    <span className="text-[10px] uppercase opacity-60">{h.severity}</span>
+                  </div>
+                </div>
+                <p className="text-[11px] opacity-75 leading-relaxed">{h.description}</p>
+                {h.evidence.length > 0 && (
+                  <p className="text-[10px] font-mono opacity-50 mt-1 truncate">
+                    Evidence: {h.evidence.join(", ")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

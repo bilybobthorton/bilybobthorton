@@ -365,6 +365,31 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── VPN teaser ─────────────────────────────────────────────────────── */}
+      <section className="px-6 py-16 border-t border-slate-800">
+        <div className="mx-auto max-w-5xl rounded-2xl border border-indigo-800/40 bg-indigo-950/20 px-8 py-10 flex flex-col sm:flex-row items-center gap-8">
+          <div className="flex-1 space-y-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-700/50 bg-indigo-900/20 px-3 py-1 text-xs text-indigo-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+              Introducing SentinelVPN
+            </span>
+            <h3 className="text-2xl font-bold text-white">
+              Add VPN protection for complete coverage.
+            </h3>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
+              SentinelCore stops malware on your device. SentinelVPN encrypts your traffic,
+              blocks C2 domains at the gateway, and shields your identity. Bundle both for $12.99/mo.
+            </p>
+          </div>
+          <a
+            href="/vpn"
+            className="shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors px-8 py-3 text-sm font-bold text-white"
+          >
+            Learn about SentinelVPN →
+          </a>
+        </div>
+      </section>
+
       {/* ── Final CTA ──────────────────────────────────────────────────────── */}
       <section className="px-6 py-24">
         <div className="mx-auto max-w-2xl text-center space-y-6">

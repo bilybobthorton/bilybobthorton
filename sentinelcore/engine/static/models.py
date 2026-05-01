@@ -78,6 +78,24 @@ class StringsResult:
 
 
 @dataclass
+class HeuristicHit:
+    name: str
+    description: str
+    severity: str
+    confidence: float
+    evidence: list[str] = field(default_factory=list)
+    mitre_technique: Optional[str] = None
+    mitre_tactic: Optional[str] = None
+
+
+@dataclass
+class HeuristicResult:
+    hits: list[HeuristicHit] = field(default_factory=list)
+    score: float = 0.0
+    verdict: str = "clean"
+
+
+@dataclass
 class StaticAnalysisResult:
     file_path: str
     file_size: int
@@ -91,3 +109,4 @@ class StaticAnalysisResult:
     strings: Optional[StringsResult] = None
     indicators: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    heuristics: Optional[HeuristicResult] = None
