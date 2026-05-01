@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QuarantineRecord {
@@ -39,6 +39,7 @@ impl QuarantineVault {
     }
 
     /// Move a file into quarantine. Returns the quarantine record.
+    #[allow(dead_code)]
     pub fn quarantine(
         &self,
         path: &Path,

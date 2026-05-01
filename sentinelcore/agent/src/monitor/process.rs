@@ -27,7 +27,7 @@ const SUSPICIOUS_CHAINS: &[(&str, &str)] = &[
 ];
 
 pub async fn start_monitor(
-    config: Arc<AgentConfig>,
+    _config: Arc<AgentConfig>,
     alert_tx: Sender<Alert>,
 ) -> anyhow::Result<()> {
     info!("Starting process monitor");

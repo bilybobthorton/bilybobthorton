@@ -63,7 +63,7 @@ fn critical_paths() -> Vec<PathBuf> {
         PathBuf::from("/etc/hosts"),
     ];
 
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     vec![]
 }
 

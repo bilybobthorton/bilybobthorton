@@ -114,7 +114,7 @@ pub async fn start_monitor(_config: Arc<AgentConfig>, tx: Sender<Alert>) -> anyh
         }
 
         let mut sys = System::new();
-        sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        sys.refresh_all();
 
         for conn in &connections {
             check_connection(conn, &bad_ips, &bad_domains, &sys, &mut alerted, &tx);
@@ -272,7 +272,7 @@ fn emit_with_proc(alert: Alert, conn: &Connection, sys: &System, tx: &Sender<Ale
 
 fn get_process_name(sys: &System, pid: u32) -> String {
     sys.process(Pid::from_u32(pid))
-        .map(|p| p.name().to_string_lossy().to_string())
+        .map(|p| p.name().to_string())
         .unwrap_or_else(|| format!("pid:{}", pid))
 }
 

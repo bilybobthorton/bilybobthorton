@@ -5,6 +5,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct LolbasEntry {
     pub name: &'static str,
     pub description: &'static str,
@@ -354,6 +355,7 @@ pub fn check_process(name: &str, cmdline: &str) -> Option<(&'static LolbasEntry,
     Some((entry, matched_args))
 }
 
+#[allow(dead_code)]
 pub fn is_lolbas(process_name: &str) -> bool {
     let name_lower = process_name.to_lowercase();
     LOLBAS_DB.contains_key(name_lower.as_str())

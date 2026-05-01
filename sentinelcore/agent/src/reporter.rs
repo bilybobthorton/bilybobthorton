@@ -112,18 +112,13 @@ impl Reporter {
 
 /// Logs all alerts locally regardless of API availability.
 pub async fn log_alerts_locally(rx: Receiver<Alert>) {
-    loop {
-        match rx.recv() {
-            Ok(alert) => {
-                tracing::warn!(
-                    alert_id = %alert.id,
-                    kind = ?alert.kind,
-                    severity = ?alert.severity,
-                    title = %alert.title,
-                    "ALERT"
-                );
-            }
-            Err(_) => break,
-        }
+    while let Ok(alert) = rx.recv() {
+        tracing::warn!(
+            alert_id = %alert.id,
+            kind = ?alert.kind,
+            severity = ?alert.severity,
+            title = %alert.title,
+            "ALERT"
+        );
     }
 }

@@ -49,6 +49,7 @@ impl Default for AgentConfig {
     }
 }
 
+#[allow(dead_code)]
 impl AgentConfig {
     pub fn load(path: &PathBuf) -> Result<Self> {
         if path.exists() {
@@ -93,7 +94,7 @@ fn default_watch_dirs() -> Vec<PathBuf> {
         PathBuf::from("/usr/local/bin"),
     ];
 
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     vec![PathBuf::from("/")]
 }
 
@@ -111,7 +112,7 @@ fn default_exclude_dirs() -> Vec<PathBuf> {
         PathBuf::from("/dev"),
     ];
 
-    #[allow(unreachable_code)]
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     vec![]
 }
 

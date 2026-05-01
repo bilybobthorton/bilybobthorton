@@ -137,14 +137,9 @@ async fn run_agent(
 
     // Fanout task — reads from raw channel, broadcasts to both reporter + log
     tokio::spawn(async move {
-        loop {
-            match raw_rx.recv() {
-                Ok(alert) => {
-                    let _ = fan_tx.send(alert.clone());
-                    let _ = fan_log_tx.send(alert);
-                }
-                Err(_) => break,
-            }
+        while let Ok(alert) = raw_rx.recv() {
+            let _ = fan_tx.send(alert.clone());
+            let _ = fan_log_tx.send(alert);
         }
     });
 
@@ -232,8 +227,8 @@ fn handle_quarantine(action: QuarantineCommands, config: &config::AgentConfig) -
                 println!("Quarantine vault is empty.");
             } else {
                 println!(
-                    "{:<36} {:<30} {:<12} {}",
-                    "Alert ID", "Filename", "Size", "Quarantined At"
+                    "{:<36} {:<30} {:<12} Quarantined At",
+                    "Alert ID", "Filename", "Size",
                 );
                 println!("{}", "-".repeat(100));
                 for r in &records {

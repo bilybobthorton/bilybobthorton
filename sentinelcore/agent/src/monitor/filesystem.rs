@@ -175,5 +175,5 @@ fn should_skip(path: &Path, config: &AgentConfig) -> bool {
     config
         .exclude_dirs
         .iter()
-        .any(|excl| path_str.starts_with(&excl.to_string_lossy().as_ref()))
+        .any(|excl| path_str.starts_with(excl.to_string_lossy().as_ref()))
 }
