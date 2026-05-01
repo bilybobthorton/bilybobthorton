@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthNav } from "@/components/AuthNav";
 
 export const metadata: Metadata = {
   title: "SentinelCore — Enterprise Malware Detection",
@@ -23,16 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/alerts"   className="text-sm text-slate-400 hover:text-white transition-colors">Alerts</a>
             <a href="/yara"     className="text-sm text-slate-400 hover:text-white transition-colors">YARA</a>
             <a href="/#pricing" className="text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
-            <div className="ml-auto flex items-center gap-3">
-              <a href="/login"
-                className="text-sm text-slate-400 hover:text-white transition-colors">
-                Log in
-              </a>
-              <a href="/register"
-                className="rounded-lg bg-red-600 hover:bg-red-500 transition-colors px-4 py-1.5 text-sm font-semibold text-white">
-                Get started free
-              </a>
-            </div>
+            <AuthNav />
           </div>
         </nav>
         <main>{children}</main>

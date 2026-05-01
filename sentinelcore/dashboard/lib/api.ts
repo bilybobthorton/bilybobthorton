@@ -1,5 +1,12 @@
 const API_BASE = "/api/v1";
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("sc_token");
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 export interface ScanSubmitted {
   scan_id: string;
   filename: string;
@@ -20,13 +27,19 @@ export interface ScanResult {
 export async function submitScan(file: File): Promise<ScanSubmitted> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/scan/file`, { method: "POST", body: form });
+  const res = await fetch(`${API_BASE}/scan/file`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: form,
+  });
   if (!res.ok) throw new Error(`Upload failed: ${res.statusText}`);
   return res.json();
 }
 
 export async function pollScan(scanId: string): Promise<ScanResult> {
-  const res = await fetch(`${API_BASE}/scan/${scanId}`);
+  const res = await fetch(`${API_BASE}/scan/${scanId}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
   return res.json();
 }
@@ -34,7 +47,7 @@ export async function pollScan(scanId: string): Promise<ScanResult> {
 export async function lookupHash(hash: string) {
   const res = await fetch(`${API_BASE}/scan/hash`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
     body: JSON.stringify({ hash }),
   });
   if (!res.ok) throw new Error(`Hash lookup failed: ${res.statusText}`);
@@ -70,13 +83,17 @@ export async function fetchAlerts(params?: {
   if (params?.hostname) query.set("hostname", params.hostname);
   if (params?.limit) query.set("limit", String(params.limit));
 
-  const res = await fetch(`${API_BASE}/agent/alerts?${query}`);
+  const res = await fetch(`${API_BASE}/agent/alerts?${query}`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Alerts fetch failed: ${res.statusText}`);
   return res.json();
 }
 
 export async function fetchAgentStats() {
-  const res = await fetch(`${API_BASE}/agent/stats`);
+  const res = await fetch(`${API_BASE}/agent/stats`, {
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) throw new Error(`Stats fetch failed: ${res.statusText}`);
   return res.json();
 }
