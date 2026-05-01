@@ -9,12 +9,10 @@ Usage:
 from __future__ import annotations
 
 import logging
-import os
 import pickle
 from pathlib import Path
 from typing import Optional
 
-from engine.ml.features import NUM_FEATURES
 
 logger = logging.getLogger(__name__)
 

@@ -6,17 +6,15 @@ Currently includes MISP event export and push.
 """
 from __future__ import annotations
 
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth.dependencies import get_current_user
 from api.config import get_settings, Settings
 from api.database import get_db
-from api.models.scan import ScanJob, User
+from api.models.scan import User
 from api.routes.report import _build_report_dict, _get_job   # reuse helpers
 from api.services.misp import build_misp_event, push_to_misp
 

@@ -1,6 +1,5 @@
 """ML model management — status, reload, and synthetic training trigger."""
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pathlib import Path
 
 from api.auth.dependencies import get_current_user
 from api.models.scan import User

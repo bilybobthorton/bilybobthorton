@@ -98,7 +98,10 @@ pub async fn start_monitor(alert_tx: Sender<Alert>) -> anyhow::Result<()> {
                     let alert = Alert::new(
                         AlertKind::CriticalFileDeleted,
                         Severity::Critical,
-                        format!("Critical system file deleted: {}", path.file_name().unwrap_or_default().to_string_lossy()),
+                        format!(
+                            "Critical system file deleted: {}",
+                            path.file_name().unwrap_or_default().to_string_lossy()
+                        ),
                         format!("System file was deleted: {}", path.display()),
                     )
                     .with_path(path.to_string_lossy());

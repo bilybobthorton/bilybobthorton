@@ -1,11 +1,10 @@
-from __future__ import annotations
 """
 Main static analysis orchestrator.
 Runs all analysis layers and produces a unified StaticAnalysisResult.
 """
-import os
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
 
 try:
     import magic

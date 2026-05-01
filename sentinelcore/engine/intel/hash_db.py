@@ -7,7 +7,6 @@ Checks file hashes against:
 
 On a cache miss the caller should fall through to VirusTotal.
 """
-import asyncio
 import logging
 from pathlib import Path
 from typing import Optional

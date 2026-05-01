@@ -1,4 +1,3 @@
-from __future__ import annotations
 """
 Heuristic analysis engine.
 
@@ -12,6 +11,7 @@ Heuristic layers:
   3. String-based rules     — VM/sandbox evasion keywords, credential harvesting, C2 IOCs
   4. Entropy rules          — high-entropy non-code sections (encrypted payload)
 """
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field

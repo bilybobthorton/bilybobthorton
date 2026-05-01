@@ -81,11 +81,7 @@ impl QuarantineVault {
         let record_path = dest.with_extension("json");
         std::fs::write(&record_path, serde_json::to_string_pretty(&record)?)?;
 
-        info!(
-            "Quarantined: {} → {}",
-            path.display(),
-            dest.display()
-        );
+        info!("Quarantined: {} → {}", path.display(), dest.display());
 
         Ok(record)
     }
@@ -113,7 +109,11 @@ impl QuarantineVault {
         let record_path = quarantine_path.with_extension("json");
         let _ = std::fs::remove_file(&record_path);
 
-        info!("Restored: {} → {}", quarantine_path.display(), original_path.display());
+        info!(
+            "Restored: {} → {}",
+            quarantine_path.display(),
+            original_path.display()
+        );
         Ok(())
     }
 

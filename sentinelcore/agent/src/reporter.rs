@@ -24,7 +24,12 @@ pub struct Reporter {
 }
 
 impl Reporter {
-    pub fn new(api_url: String, api_key: String, agent_id: String, hostname: String) -> Result<Self> {
+    pub fn new(
+        api_url: String,
+        api_key: String,
+        agent_id: String,
+        hostname: String,
+    ) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
             .user_agent("SentinelCore-Agent/0.1")

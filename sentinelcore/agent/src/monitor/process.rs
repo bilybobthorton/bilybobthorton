@@ -56,9 +56,7 @@ pub async fn start_monitor(
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            let exe_path = process
-                .exe()
-                .map(|p| p.to_string_lossy().to_string());
+            let exe_path = process.exe().map(|p| p.to_string_lossy().to_string());
 
             let parent_pid = process.parent().map(|p| p.as_u32());
             let parent_name = parent_pid.and_then(|ppid| {

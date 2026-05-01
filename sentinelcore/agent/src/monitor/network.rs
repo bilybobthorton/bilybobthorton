@@ -29,7 +29,7 @@ const SUSPICIOUS_PORTS: &[u16] = &[
     4444,  // Metasploit default
     1337,  // Common leet-speak hacker port
     31337, // Bo2k / common attacker port
-    6666, 7777, 8888, 9999, // Common RAT ports
+    6666, 7777, 8888, 9999,  // Common RAT ports
     52100, // CobaltStrike default (older)
     50050, // CobaltStrike teamserver
     4899,  // Radmin RAT
@@ -177,7 +177,10 @@ fn check_connection(
     // ── Check 1: known-bad IP ──────────────────────────────────────────────
     if bad_ips.contains(conn.remote_ip.as_str()) {
         alerted.insert(dedup_key.clone());
-        let proc_name = conn.pid.map(|p| get_process_name(sys, p)).unwrap_or_default();
+        let proc_name = conn
+            .pid
+            .map(|p| get_process_name(sys, p))
+            .unwrap_or_default();
         let alert = Alert::new(
             AlertKind::C2ConnectionDetected,
             Severity::Critical,
@@ -199,7 +202,10 @@ fn check_connection(
     for domain in bad_domains {
         if conn.remote_ip.contains(domain) {
             alerted.insert(dedup_key.clone());
-            let proc_name = conn.pid.map(|p| get_process_name(sys, p)).unwrap_or_default();
+            let proc_name = conn
+                .pid
+                .map(|p| get_process_name(sys, p))
+                .unwrap_or_default();
             let alert = Alert::new(
                 AlertKind::C2ConnectionDetected,
                 Severity::Critical,
@@ -218,7 +224,10 @@ fn check_connection(
     // ── Check 3: suspicious C2 port ───────────────────────────────────────
     if SUSPICIOUS_PORTS.contains(&conn.remote_port) {
         // Only alert if the process isn't obviously a legitimate security tool
-        let proc_name = conn.pid.map(|p| get_process_name(sys, p)).unwrap_or_default();
+        let proc_name = conn
+            .pid
+            .map(|p| get_process_name(sys, p))
+            .unwrap_or_default();
         let safe = ["ssh", "nc", "ncat", "nmap", "sentinel-agent"];
         if !safe.iter().any(|s| proc_name.contains(s)) {
             alerted.insert(dedup_key.clone());
@@ -306,7 +315,8 @@ fn parse_proc_net_tcp() -> anyhow::Result<Vec<Connection>> {
             if fields[3] != "01" {
                 continue;
             }
-            let Some((local_port, remote_ip, remote_port)) = parse_hex_addr(fields[1], fields[2]) else {
+            let Some((local_port, remote_ip, remote_port)) = parse_hex_addr(fields[1], fields[2])
+            else {
                 continue;
             };
             // Skip loopback
@@ -318,7 +328,12 @@ fn parse_proc_net_tcp() -> anyhow::Result<Vec<Connection>> {
             let inode: u64 = fields[9].parse().unwrap_or(0);
             let pid = inode_to_pid(inode);
 
-            connections.push(Connection { local_port, remote_ip, remote_port, pid });
+            connections.push(Connection {
+                local_port,
+                remote_ip,
+                remote_port,
+                pid,
+            });
         }
     }
 
@@ -425,8 +440,13 @@ async fn parse_netstat() -> anyhow::Result<Vec<Connection>> {
         }
         // Remote addr is fields[4] in ss, fields[4] in netstat
         let remote = fields.get(4).copied().unwrap_or("");
-        let Some(colon) = remote.rfind(':') else { continue };
-        let remote_ip = remote[..colon].trim_matches('[').trim_matches(']').to_string();
+        let Some(colon) = remote.rfind(':') else {
+            continue;
+        };
+        let remote_ip = remote[..colon]
+            .trim_matches('[')
+            .trim_matches(']')
+            .to_string();
         let remote_port: u16 = remote[colon + 1..].parse().unwrap_or(0);
 
         if remote_ip == "127.0.0.1" || remote_ip == "::1" || remote_ip.is_empty() {

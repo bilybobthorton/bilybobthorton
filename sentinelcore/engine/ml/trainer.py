@@ -20,7 +20,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 
@@ -63,8 +62,6 @@ def train(
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import classification_report, roc_auc_score
     from sklearn.model_selection import train_test_split
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.pipeline import Pipeline
 
     Xm, ym = _collect_features(malware_dir, label=1, max_files=max_files)
     Xb, yb = _collect_features(benign_dir, label=0, max_files=max_files)

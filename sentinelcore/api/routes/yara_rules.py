@@ -92,10 +92,10 @@ async def list_rules(
     """List all YARA rules visible to this user (built-ins + their own)."""
     async with get_session() as session:
         q = select(YaraRule).where(
-            (YaraRule.is_builtin == True) | (YaraRule.user_id == current_user.id)
+            YaraRule.is_builtin.is_(True) | (YaraRule.user_id == current_user.id)
         )
         if enabled_only:
-            q = q.where(YaraRule.enabled == True)
+            q = q.where(YaraRule.enabled.is_(True))
         q = q.order_by(YaraRule.is_builtin.desc(), YaraRule.created_at.desc())
         result = await session.execute(q)
         rules = result.scalars().all()
@@ -214,7 +214,7 @@ async def _fetch_rule(rule_id: str, user: User) -> YaraRule:
         result = await session.execute(
             select(YaraRule).where(
                 (YaraRule.id == uuid.UUID(rule_id)) &
-                ((YaraRule.is_builtin == True) | (YaraRule.user_id == user.id))
+                (YaraRule.is_builtin.is_(True) | (YaraRule.user_id == user.id))
             )
         )
         rule = result.scalar_one_or_none()

@@ -11,22 +11,29 @@ use tracing::{debug, info, warn};
 
 /// File extensions that are high-risk and always scanned
 const HIGH_RISK_EXTENSIONS: &[&str] = &[
-    "exe", "dll", "bat", "cmd", "ps1", "vbs", "js", "jse", "vbe",
-    "hta", "scr", "pif", "com", "cpl", "msi", "msp", "jar", "py",
-    "sh", "elf", "so", "dylib", "dmg", "pkg", "deb", "rpm",
+    "exe", "dll", "bat", "cmd", "ps1", "vbs", "js", "jse", "vbe", "hta", "scr", "pif", "com",
+    "cpl", "msi", "msp", "jar", "py", "sh", "elf", "so", "dylib", "dmg", "pkg", "deb", "rpm",
 ];
 
 /// Known-malicious file name patterns
 const SUSPICIOUS_FILENAMES: &[&str] = &[
-    "mimikatz", "meterpreter", "cobalt", "beacon", "payload",
-    "empire", "metasploit", "exploit", "shellcode", "keylogger",
-    "ransomware", "cryptominer", "xmrig", "lazagne",
+    "mimikatz",
+    "meterpreter",
+    "cobalt",
+    "beacon",
+    "payload",
+    "empire",
+    "metasploit",
+    "exploit",
+    "shellcode",
+    "keylogger",
+    "ransomware",
+    "cryptominer",
+    "xmrig",
+    "lazagne",
 ];
 
-pub async fn start_monitor(
-    config: Arc<AgentConfig>,
-    alert_tx: Sender<Alert>,
-) -> Result<()> {
+pub async fn start_monitor(config: Arc<AgentConfig>, alert_tx: Sender<Alert>) -> Result<()> {
     info!("Starting filesystem monitor");
 
     let (tx, rx) = crossbeam_channel::unbounded();
@@ -58,11 +65,7 @@ pub async fn start_monitor(
     Ok(())
 }
 
-async fn handle_event(
-    event: &Event,
-    config: &AgentConfig,
-    alert_tx: &Sender<Alert>,
-) -> Result<()> {
+async fn handle_event(event: &Event, config: &AgentConfig, alert_tx: &Sender<Alert>) -> Result<()> {
     match &event.kind {
         EventKind::Create(_) | EventKind::Modify(_) => {
             for path in &event.paths {
@@ -79,11 +82,7 @@ async fn handle_event(
     Ok(())
 }
 
-async fn scan_file(
-    path: &Path,
-    alert_tx: &Sender<Alert>,
-    config: &AgentConfig,
-) -> Result<()> {
+async fn scan_file(path: &Path, alert_tx: &Sender<Alert>, config: &AgentConfig) -> Result<()> {
     if !path.is_file() {
         return Ok(());
     }
@@ -130,15 +129,24 @@ async fn scan_file(
     // TODO: check hashes against local DB and VirusTotal
     // For now, flag executables dropped in temp directories
     let path_str = path.to_string_lossy().to_lowercase();
-    let is_suspicious_location = ["/tmp", "/var/tmp", "\\temp\\", "\\tmp\\", "appdata\\local\\temp"]
-        .iter()
-        .any(|loc| path_str.contains(loc));
+    let is_suspicious_location = [
+        "/tmp",
+        "/var/tmp",
+        "\\temp\\",
+        "\\tmp\\",
+        "appdata\\local\\temp",
+    ]
+    .iter()
+    .any(|loc| path_str.contains(loc));
 
     if is_suspicious_location {
         let alert = Alert::new(
             AlertKind::SuspiciousFileCreated,
             Severity::Medium,
-            format!("Executable in temp directory: {}", path.file_name().unwrap_or_default().to_string_lossy()),
+            format!(
+                "Executable in temp directory: {}",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ),
             format!(
                 "Executable file created in suspicious location: {}",
                 path.display()

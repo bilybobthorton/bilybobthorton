@@ -1,8 +1,9 @@
-from __future__ import annotations
 """
 Scan rate limiting for free tier users.
 Uses Redis for atomic daily counters — resets at midnight UTC.
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis

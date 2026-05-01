@@ -27,7 +27,11 @@ struct Cli {
     command: Option<Commands>,
 
     /// API endpoint to report alerts to
-    #[arg(long, env = "SENTINEL_API_URL", default_value = "http://localhost:8000")]
+    #[arg(
+        long,
+        env = "SENTINEL_API_URL",
+        default_value = "http://localhost:8000"
+    )]
     api_url: String,
 
     /// API key for authentication
@@ -78,8 +82,7 @@ async fn main() -> Result<()> {
     // Initialize structured logging
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
         )
         .with_target(false)
         .compact()
@@ -105,7 +108,11 @@ async fn main() -> Result<()> {
     }
 }
 
-async fn run_agent(config: Arc<config::AgentConfig>, api_url: String, api_key: String) -> Result<()> {
+async fn run_agent(
+    config: Arc<config::AgentConfig>,
+    api_url: String,
+    api_key: String,
+) -> Result<()> {
     let hostname = hostname::get()
         .map(|h| h.to_string_lossy().to_string())
         .unwrap_or_else(|_| "unknown".to_string());
@@ -116,10 +123,7 @@ async fn run_agent(config: Arc<config::AgentConfig>, api_url: String, api_key: S
     info!("Hostname: {}", hostname);
     info!("Agent ID: {}", agent_id);
     info!("Auto-quarantine: {}", config.auto_quarantine);
-    info!(
-        "Watching {} directories",
-        config.watch_dirs.len()
-    );
+    info!("Watching {} directories", config.watch_dirs.len());
 
     // Alert channel — all monitors write here, reporter reads
     let (alert_tx, alert_rx) = unbounded::<alert::Alert>();
@@ -189,7 +193,8 @@ async fn run_agent(config: Arc<config::AgentConfig>, api_url: String, api_key: S
 
     // API reporter (only if API key provided)
     if !api_key.is_empty() {
-        match reporter::Reporter::new(api_url.clone(), api_key, agent_id.clone(), hostname.clone()) {
+        match reporter::Reporter::new(api_url.clone(), api_key, agent_id.clone(), hostname.clone())
+        {
             Ok(rep) => {
                 let rep = Arc::new(rep);
                 tokio::spawn(async move {
@@ -198,7 +203,10 @@ async fn run_agent(config: Arc<config::AgentConfig>, api_url: String, api_key: S
                 info!("Alert reporter active — shipping to {}", api_url);
             }
             Err(e) => {
-                error!("Failed to initialize reporter: {} — alerts will only log locally", e);
+                error!(
+                    "Failed to initialize reporter: {} — alerts will only log locally",
+                    e
+                );
             }
         }
     } else {
@@ -223,7 +231,10 @@ fn handle_quarantine(action: QuarantineCommands, config: &config::AgentConfig) -
             if records.is_empty() {
                 println!("Quarantine vault is empty.");
             } else {
-                println!("{:<36} {:<30} {:<12} {}", "Alert ID", "Filename", "Size", "Quarantined At");
+                println!(
+                    "{:<36} {:<30} {:<12} {}",
+                    "Alert ID", "Filename", "Size", "Quarantined At"
+                );
                 println!("{}", "-".repeat(100));
                 for r in &records {
                     let filename = PathBuf::from(&r.original_path)
