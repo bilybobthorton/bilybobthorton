@@ -1,6 +1,8 @@
 const TOKEN_KEY = "sc_token";
 const EMAIL_KEY = "sc_email";
 const APIKEY_KEY = "sc_apikey";
+const TIER_KEY = "sc_tier";
+const TRIAL_KEY = "sc_trial_ends";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -17,16 +19,49 @@ export function getApiKey(): string | null {
   return localStorage.getItem(APIKEY_KEY);
 }
 
-export function storeSession(token: string, email: string, apiKey: string) {
+export function getStoredTier(): string {
+  if (typeof window === "undefined") return "free";
+  return localStorage.getItem(TIER_KEY) ?? "free";
+}
+
+export function getTrialEndsAt(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TRIAL_KEY);
+}
+
+export function isTrialActive(): boolean {
+  const t = getTrialEndsAt();
+  if (!t) return false;
+  return new Date(t) > new Date();
+}
+
+export function trialDaysLeft(): number | null {
+  const t = getTrialEndsAt();
+  if (!t) return null;
+  const diff = new Date(t).getTime() - Date.now();
+  if (diff <= 0) return null;
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export function storeSession(
+  token: string,
+  email: string,
+  apiKey: string,
+  tier = "free",
+  trialEndsAt: string | null = null,
+) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(EMAIL_KEY, email);
   localStorage.setItem(APIKEY_KEY, apiKey);
+  localStorage.setItem(TIER_KEY, tier);
+  if (trialEndsAt) localStorage.setItem(TRIAL_KEY, trialEndsAt);
+  else localStorage.removeItem(TRIAL_KEY);
 }
 
 export function clearSession() {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(EMAIL_KEY);
-  localStorage.removeItem(APIKEY_KEY);
+  [TOKEN_KEY, EMAIL_KEY, APIKEY_KEY, TIER_KEY, TRIAL_KEY].forEach((k) =>
+    localStorage.removeItem(k),
+  );
 }
 
 export function authHeaders(): Record<string, string> {
@@ -41,6 +76,8 @@ export interface AuthResponse {
   access_token: string;
   token_type: string;
   api_key: string;
+  tier: string;
+  trial_ends_at?: string | null;
 }
 
 export async function apiRegister(email: string, password: string): Promise<AuthResponse> {

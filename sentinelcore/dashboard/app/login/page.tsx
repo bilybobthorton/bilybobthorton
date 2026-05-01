@@ -15,7 +15,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await apiLogin(email, password);
-      storeSession(data.access_token, email, data.api_key);
+      storeSession(data.access_token, email, data.api_key, data.tier, data.trial_ends_at ?? null);
       window.location.href = "/scan";
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Login failed");

@@ -33,6 +33,7 @@ class User(Base):
     api_key = Column(String(64), unique=True, index=True)
     scans_today = Column(Integer, default=0)
     scans_reset_at = Column(DateTime(timezone=True))
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

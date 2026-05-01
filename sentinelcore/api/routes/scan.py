@@ -3,9 +3,9 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth.dependencies import get_current_user, get_current_user_optional
@@ -41,7 +41,19 @@ class ScanResult(BaseModel):
     ml: dict | None = None
     virustotal: dict | None = None
     otx: dict | None = None
+    heuristics: dict | None = None
     error: str | None
+
+
+class ScanHistoryItem(BaseModel):
+    scan_id: str
+    filename: str
+    sha256: str | None
+    status: str
+    threat_level: str | None
+    confidence: float | None
+    created_at: str
+    completed_at: str | None
 
 
 @router.post("/file", response_model=ScanSubmitted, status_code=status.HTTP_202_ACCEPTED)
@@ -113,6 +125,7 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
         ml_data = job.result_json.get("ml")
         vt_data = job.result_json.get("virustotal")
         otx_data = job.result_json.get("otx")
+        heuristics_data = job.result_json.get("heuristics")
 
     return ScanResult(
         scan_id=str(job.id),
@@ -125,8 +138,40 @@ async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
         ml=ml_data,
         virustotal=vt_data,
         otx=otx_data,
+        heuristics=heuristics_data,
         error=job.error,
     )
+
+
+@router.get("/history", response_model=list[ScanHistoryItem])
+async def scan_history(
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the authenticated user's scan history, newest first."""
+    result = await db.execute(
+        select(ScanJob)
+        .where(ScanJob.user_id == current_user.id)
+        .order_by(desc(ScanJob.created_at))
+        .limit(limit)
+        .offset(offset)
+    )
+    jobs = result.scalars().all()
+    return [
+        ScanHistoryItem(
+            scan_id=str(j.id),
+            filename=j.filename,
+            sha256=j.result_json.get("hashes", {}).get("sha256") if j.result_json else None,
+            status=j.status,
+            threat_level=j.threat_level,
+            confidence=j.confidence,
+            created_at=j.created_at.isoformat() if j.created_at else "",
+            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+        )
+        for j in jobs
+    ]
 
 
 @router.post("/hash")

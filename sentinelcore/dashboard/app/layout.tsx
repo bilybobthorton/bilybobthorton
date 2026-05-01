@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="font-semibold text-white tracking-tight">SentinelCore</span>
             </a>
             <a href="/scan"     className="text-sm text-slate-400 hover:text-white transition-colors">Scan</a>
+            <a href="/history"  className="text-sm text-slate-400 hover:text-white transition-colors">History</a>
             <a href="/alerts"   className="text-sm text-slate-400 hover:text-white transition-colors">Alerts</a>
             <a href="/yara"     className="text-sm text-slate-400 hover:text-white transition-colors">YARA</a>
             <a href="/vpn"      className="text-sm text-indigo-400 hover:text-indigo-200 transition-colors font-medium">VPN</a>

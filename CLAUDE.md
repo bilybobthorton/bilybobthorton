@@ -70,7 +70,7 @@ Update after every major session.
 
 ---
 
-## What Is Built (as of Session 4)
+## What Is Built (as of Session 6)
 
 ### Python Engine (`sentinelcore/engine/`)
 - `static/hasher.py` — streaming MD5/SHA1/SHA256/ssdeep
@@ -98,8 +98,8 @@ Update after every major session.
 - `models/yara_rule.py` — YaraRule (custom + built-in)
 - `auth/jwt.py` — hash_password, verify_password, create_access_token, generate_api_key
 - `auth/dependencies.py` — get_current_user (JWT Bearer → X-API-Key fallback)
-- `routes/auth.py` — POST /api/v1/auth/register, /login
-- `routes/scan.py` — POST /api/v1/scan/file, GET /api/v1/scan/{id}, POST /api/v1/scan/hash, GET /scan/quota/me
+- `routes/auth.py` — POST /api/v1/auth/register, /login; 14-day Pro trial set on register; returns tier + trial_ends_at
+- `routes/scan.py` — POST /api/v1/scan/file, GET /api/v1/scan/{id} (now includes heuristics), GET /api/v1/scan/history (paginated), POST /api/v1/scan/hash, GET /scan/quota/me
 - `routes/agent.py` — POST/GET /api/v1/agent/alert(s), GET /api/v1/agent/stats
 - `routes/admin.py` — GET /api/v1/admin/stats (Enterprise only)
 - `routes/billing.py` — POST checkout/portal/webhook, GET subscription
@@ -148,11 +148,13 @@ Email alert fires after scan if MALICIOUS or SUSPICIOUS and user has RESEND_API_
 ### Next.js Dashboard (`sentinelcore/dashboard/`)
 - `/` — marketing landing page: hero, stats bar, 4-layer detection cards, features grid, how-it-works, pricing (Free/Pro/Enterprise), VPN teaser banner, final CTA
 - `/scan` — drag-drop file upload, live polling, scan result with threat badge, ML/VT/OTX/Heuristics pills, heuristic hit cards with MITRE tags, "View report" + "↓ PDF" buttons
+- `/history` — paginated scan history table: filename, SHA256 snippet, threat badge, status pill, date; links to report
 - `/alerts` — real-time agent alerts (5s refresh), severity cards, detail drawer
 - `/yara` — YARA rule editor with live syntax validation
 - `/billing` — plan comparison + Stripe checkout + portal
 - `/vpn` — SentinelVPN landing page: hero, AV vs VPN coverage table, 6 feature cards, pricing (VPN Free/Pro/Bundle/Enterprise), CTA
-- Nav: sticky with backdrop-blur, VPN link (indigo), AuthNav (avatar dropdown or Log in / Get started CTA), footer
+- `/settings` — email, plan, trial banner (days left + upgrade CTA), API key copy, scan history link, sign out
+- Nav: sticky with backdrop-blur, History + VPN links, AuthNav (avatar dropdown or Log in / Get started CTA), footer
 
 ### Infrastructure
 - `infra/docker-compose.yml` — dev stack (api, worker, db, redis, nginx, flower, migrate)
@@ -314,3 +316,14 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Built SentinelVPN product (`/vpn` page): hero, AV-vs-VPN coverage comparison table, 6 feature cards (WireGuard, zero-log, threat-aware routing, kill switch, DNS leak protection, global servers), 4-tier pricing (Free/Pro/Bundle/Enterprise), CTA
 - Added VPN teaser banner to main landing page (indigo accent, bundle pitch, links to /vpn)
 - Added VPN nav link (indigo color, distinct from main nav items)
+
+### Session 6 — 2026-05-01
+- Fixed all CI failures: E402 docstring ordering in 3 Python files, moved asynccontextmanager import in database.py, auto-fixed 14 F401 unused imports, fixed 3 E712 SQLAlchemy `== True` → `.is_(True)`; ran `cargo fmt` across all Rust source files
+- Added dashboard .gitignore + committed package-lock.json for reproducible npm ci in CI
+- Added 14-day Pro trial: `trial_ends_at` column on User (migration 0004), set on register, rate limiter treats active-trial users as Pro tier
+- auth.py now returns `tier` + `trial_ends_at` in TokenResponse; stored in localStorage (sc_tier, sc_trial_ends)
+- Added `GET /api/v1/scan/history` endpoint (paginated, auth-required)
+- ScanResult API response now includes `heuristics` key (was in result_json, not surfaced)
+- Built `/history` page: scan table with threat badges, status pills, date, SHA256 snippet, links to reports
+- Settings page: trial banner with days-remaining + upgrade CTA, plan display, history link
+- Added History to nav

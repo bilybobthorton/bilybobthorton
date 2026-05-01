@@ -1,6 +1,7 @@
 """
 Scan rate limiting for free tier users.
 Uses Redis for atomic daily counters — resets at midnight UTC.
+Trial users get Pro-tier limits for the duration of their trial.
 """
 from __future__ import annotations
 
@@ -35,11 +36,12 @@ async def check_and_increment(user: User | None) -> int:
     Raises HTTP 429 if limit exceeded.
     """
     if user is None:
-        # Anonymous users: 1 scan per IP would be ideal, but for now allow
-        # a small anonymous quota tracked by a session key.  Keep simple.
         return 0
 
     tier = user.tier or "free"
+    # Active trial → treat as Pro for limit purposes
+    if tier == "free" and user.trial_ends_at and user.trial_ends_at > datetime.now(timezone.utc):
+        tier = "pro"
 
     limits = {
         "free": settings.free_tier_scans_per_day,
@@ -78,6 +80,8 @@ async def check_and_increment(user: User | None) -> int:
 async def get_remaining(user: User) -> dict:
     """Return scan quota info for the current user."""
     tier = user.tier or "free"
+    if tier == "free" and user.trial_ends_at and user.trial_ends_at > datetime.now(timezone.utc):
+        tier = "pro"
     limits = {
         "free": settings.free_tier_scans_per_day,
         "pro": settings.pro_tier_scans_per_day,

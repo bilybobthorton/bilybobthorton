@@ -1,12 +1,16 @@
 import uuid
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.auth.jwt import create_access_token, generate_api_key, hash_password, verify_password
 from api.database import get_db
 from api.models.scan import User
+
+TRIAL_DAYS = 14
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,6 +29,8 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     api_key: str
+    tier: str = "free"
+    trial_ends_at: str | None = None
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -33,18 +39,25 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    trial_ends = datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
     user = User(
         id=uuid.uuid4(),
         email=body.email,
         hashed_password=hash_password(body.password),
         api_key=generate_api_key(),
+        trial_ends_at=trial_ends,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
     token = create_access_token(str(user.id))
-    return TokenResponse(access_token=token, api_key=user.api_key)
+    return TokenResponse(
+        access_token=token,
+        api_key=user.api_key,
+        tier=user.tier or "free",
+        trial_ends_at=user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -56,4 +69,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_access_token(str(user.id))
-    return TokenResponse(access_token=token, api_key=user.api_key)
+    return TokenResponse(
+        access_token=token,
+        api_key=user.api_key,
+        tier=user.tier or "free",
+        trial_ends_at=user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+    )

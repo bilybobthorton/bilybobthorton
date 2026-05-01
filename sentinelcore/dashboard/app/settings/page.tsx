@@ -1,16 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getStoredEmail, getApiKey, clearSession } from "@/lib/auth";
-import { Copy, Check, ShieldAlert } from "lucide-react";
+import { getStoredEmail, getApiKey, getStoredTier, trialDaysLeft, isTrialActive, clearSession } from "@/lib/auth";
+import { Copy, Check, ShieldAlert, Zap } from "lucide-react";
 
 export default function SettingsPage() {
-  const [email, setEmail]     = useState<string | null>(null);
-  const [apiKey, setApiKey]   = useState<string | null>(null);
-  const [copied, setCopied]   = useState(false);
+  const [email, setEmail]       = useState<string | null>(null);
+  const [apiKey, setApiKey]     = useState<string | null>(null);
+  const [tier, setTier]         = useState<string>("free");
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [onTrial, setOnTrial]   = useState(false);
+  const [copied, setCopied]     = useState(false);
 
   useEffect(() => {
     setEmail(getStoredEmail());
     setApiKey(getApiKey());
+    setTier(getStoredTier());
+    setDaysLeft(trialDaysLeft());
+    setOnTrial(isTrialActive());
   }, []);
 
   function copyKey() {
@@ -40,12 +46,46 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl px-6 py-10 space-y-6">
       <h1 className="text-2xl font-bold text-white">Account Settings</h1>
 
+      {/* Trial banner */}
+      {onTrial && (
+        <div className="rounded-xl border border-amber-700/50 bg-amber-900/20 px-5 py-4 flex items-center gap-3">
+          <Zap size={18} className="text-amber-400 shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-amber-300">
+              Pro Trial Active — {daysLeft} day{daysLeft !== 1 ? "s" : ""} remaining
+            </p>
+            <p className="text-xs text-amber-500 mt-0.5">
+              You have full Pro access. Upgrade before your trial ends to keep it.
+            </p>
+          </div>
+          <a
+            href="/billing"
+            className="ml-auto shrink-0 rounded-lg bg-amber-600 hover:bg-amber-500 transition-colors px-4 py-1.5 text-xs font-semibold text-white"
+          >
+            Upgrade now
+          </a>
+        </div>
+      )}
+
       {/* Account info */}
       <div className="rounded-xl border border-slate-800 bg-[#0d0d14] p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Profile</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Email</p>
+            <p className="text-sm text-white">{email}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Plan</p>
+            <p className="text-sm text-white capitalize">
+              {tier}{onTrial ? <span className="ml-1.5 text-xs text-amber-400">(trial)</span> : null}
+            </p>
+          </div>
+        </div>
         <div>
-          <p className="text-xs text-slate-500 mb-1">Email</p>
-          <p className="text-sm text-white">{email}</p>
+          <a href="/history" className="text-xs text-slate-400 hover:text-white transition-colors underline">
+            View scan history →
+          </a>
         </div>
       </div>
 
