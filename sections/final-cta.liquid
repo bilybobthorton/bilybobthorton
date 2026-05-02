@@ -1,0 +1,72 @@
+<section class="final-cta">
+  <div class="container">
+    <div class="cta-inner">
+      <div class="cta-glow"></div>
+      <h2 class="cta-title">Start protecting your endpoints today</h2>
+      <p class="cta-subtitle">
+        Free forever. No credit card. Full 5-layer detection on every scan.
+        Upgrade to Pro anytime with a 14-day free trial.
+      </p>
+      <div class="cta-actions">
+        <a href="https://app.redgaurd.com/register" class="btn btn-primary btn-xl">
+          Create free account →
+        </a>
+        <a href="https://app.redgaurd.com/scan" class="btn btn-ghost btn-xl">
+          Try without signing up
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a href="/" class="logo">
+          <svg class="logo-hex" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L21.5 7.5V16.5L12 22L2.5 16.5V7.5L12 2Z" stroke="#6366f1" stroke-width="1.5" fill="none"/>
+            <path d="M12 6L17.5 9.25V15.75L12 19L6.5 15.75V9.25L12 6Z" fill="#6366f1" opacity="0.3"/>
+            <circle cx="12" cy="12" r="2.5" fill="#6366f1"/>
+          </svg>
+          <span class="logo-text">RedGuard</span>
+        </a>
+        <p class="footer-tagline">Military-grade endpoint protection for everyone.</p>
+      </div>
+
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="https://app.redgaurd.com/scan">Scanner</a>
+          <a href="https://app.redgaurd.com/vpn">SentinelVPN</a>
+          <a href="https://app.redgaurd.com/api-docs">API Docs</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+        <div class="footer-col">
+          <h4>Dashboard</h4>
+          <a href="https://app.redgaurd.com/login">Log in</a>
+          <a href="https://app.redgaurd.com/register">Sign up</a>
+          <a href="https://app.redgaurd.com/dashboard">My Dashboard</a>
+          <a href="https://app.redgaurd.com/settings">Settings</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="mailto:support@redgaurd.com">Support</a>
+          <a href="mailto:sales@redgaurd.com">Sales</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; {{ 'now' | date: "%Y" }} RedGuard. All rights reserved.</p>
+      <p class="footer-tech">Powered by WireGuard® · VirusTotal · AlienVault OTX</p>
+    </div>
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Final CTA",
+  "settings": []
+}
+{% endschema %}
