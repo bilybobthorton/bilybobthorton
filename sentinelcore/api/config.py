@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Email notifications (Resend — resend.com, free tier 3k/mo)
     resend_api_key: str = ""
-    email_from: str = "SentinelCore <alerts@sentinelcore.io>"
+    email_from: str = "RedGuard <alerts@redgaurd.com>"
     app_base_url: str = "http://localhost:3000"
 
     # MISP integration — Enterprise tier
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # SentinelVPN — WireGuard server config
     vpn_server_public_key: str = ""   # wg pubkey < /etc/wireguard/server_private.key
-    vpn_server_endpoint: str = ""     # e.g. vpn1.sentinelguard.com:51820
+    vpn_server_endpoint: str = ""     # e.g. vpn1.redgaurd.com:51820
     vpn_dns: str = "1.1.1.1, 1.0.0.1"
 
     celery_broker_url: str = "redis://localhost:6379/1"

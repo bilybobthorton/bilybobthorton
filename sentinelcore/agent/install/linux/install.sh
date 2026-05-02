@@ -4,9 +4,9 @@
 # Supports: Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 36+
 #
 # Usage:
-#   curl -fsSL https://yourdomain.com/install/linux | sudo bash
+#   curl -fsSL https://redgaurd.com/install/linux | sudo bash
 # Or locally:
-#   sudo bash install.sh --api-url https://yourdomain.com --api-key sk_...
+#   sudo bash install.sh --api-url https://redgaurd.com --api-key sk_...
 #
 # Options:
 #   --api-url URL       SentinelCore API base URL (required)
@@ -224,7 +224,7 @@ else
   cat > "$SERVICE_FILE" << UNIT
 [Unit]
 Description=SentinelCore Endpoint Agent
-Documentation=https://yourdomain.com/api-docs
+Documentation=https://redgaurd.com/api-docs
 After=network-online.target
 Wants=network-online.target
 

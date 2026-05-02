@@ -16,7 +16,7 @@ interface Location {
 
 const LOCATIONS: Location[] = [
   { id: "us-east",    city: "New York",       country: "United States", flag: "🇺🇸", region: "Americas",      latency: "~12ms",  tier: "free", status: "online"      },
-  { id: "us-west",    city: "San Francisco",  country: "United States", flag: "🇺🇸", region: "Americas",      latency: "~18ms",  tier: "pro",  status: "online"      },
+  { id: "us-west",    city: "San Francisco",  country: "United States", flag: "🇺🇸", region: "Americas",      latency: "~28ms",  tier: "pro",  status: "coming_soon" },
   { id: "eu-west",    city: "Amsterdam",      country: "Netherlands",   flag: "🇳🇱", region: "Europe",        latency: "~35ms",  tier: "pro",  status: "coming_soon" },
   { id: "eu-central", city: "Frankfurt",      country: "Germany",       flag: "🇩🇪", region: "Europe",        latency: "~40ms",  tier: "pro",  status: "coming_soon" },
   { id: "ap-south",   city: "Singapore",      country: "Singapore",     flag: "🇸🇬", region: "Asia Pacific",  latency: "~110ms", tier: "pro",  status: "coming_soon" },

@@ -68,8 +68,8 @@ nano /opt/sentinelcore/sentinelcore/.env
 Required fields to fill in:
 
 ```env
-DOMAIN=yourdomain.com
-APP_BASE_URL=https://yourdomain.com
+DOMAIN=redgaurd.com
+APP_BASE_URL=https://redgaurd.com
 
 # Threat intel (free keys — get them now if you haven't)
 VIRUSTOTAL_API_KEY=   # https://virustotal.com → API key in profile
@@ -77,7 +77,7 @@ OTX_API_KEY=          # https://otx.alienvault.com → API key in profile
 
 # Email (free tier = 3k emails/mo)
 RESEND_API_KEY=re_... # https://resend.com/api-keys
-EMAIL_FROM=SentinelCore <alerts@yourdomain.com>
+EMAIL_FROM=SentinelCore <alerts@redgaurd.com>
 
 # Stripe (use test keys for now, swap to live when ready to charge)
 STRIPE_SECRET_KEY=sk_test_...
@@ -94,11 +94,11 @@ Leave `VPN_SERVER_PUBLIC_KEY` blank until step 6.
 
 ```bash
 cd /opt/sentinelcore/sentinelcore
-bash scripts/init-letsencrypt.sh yourdomain.com your@email.com
+bash scripts/init-letsencrypt.sh redgaurd.com your@email.com
 ```
 
 This uses webroot challenge — nginx must be reachable on port 80.
-If it fails, verify DNS propagation: `dig +short yourdomain.com`.
+If it fails, verify DNS propagation: `dig +short redgaurd.com`.
 
 ---
 
@@ -114,7 +114,7 @@ make prod-migrate  # run Alembic migrations
 Verify everything is up:
 ```bash
 make prod-logs         # watch logs
-curl https://yourdomain.com/health  # should return {"status":"ok"}
+curl https://redgaurd.com/health  # should return {"status":"ok"}
 ```
 
 ---
@@ -122,7 +122,7 @@ curl https://yourdomain.com/health  # should return {"status":"ok"}
 ## 6 — Configure Stripe Webhook
 
 1. Go to **dashboard.stripe.com → Developers → Webhooks**
-2. Add endpoint: `https://yourdomain.com/api/v1/billing/webhook`
+2. Add endpoint: `https://redgaurd.com/api/v1/billing/webhook`
 3. Select events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
 4. Copy the webhook signing secret (`whsec_...`)
 5. Update `.env`: `STRIPE_WEBHOOK_SECRET=whsec_...`
@@ -195,7 +195,7 @@ cd /opt/sentinelcore/sentinelcore && bash scripts/deploy.sh
 | View logs | `make prod-logs` |
 | Restart stack | `make prod-down && make prod-up` |
 | Run migrations | `make prod-migrate` |
-| Check API health | `curl https://yourdomain.com/health` |
+| Check API health | `curl https://redgaurd.com/health` |
 | Add VPN peer manually | `wg-add-peer <pubkey> <psk> <ip>` (on VPN droplet) |
 | View WireGuard peers | `wg show` (on VPN droplet) |
 
@@ -223,7 +223,7 @@ cd /opt/sentinelcore/sentinelcore && bash scripts/deploy.sh
 - [ ] `.env` filled in (VT key, OTX key, Resend key, Stripe keys, domain)
 - [ ] TLS cert issued via `init-letsencrypt.sh`
 - [ ] `make prod-build && make prod-up && make prod-migrate`
-- [ ] `curl https://yourdomain.com/health` returns `{"status":"ok"}`
+- [ ] `curl https://redgaurd.com/health` returns `{"status":"ok"}`
 - [ ] Stripe webhook endpoint configured
 - [ ] ML model trained (at minimum synthetic)
 - [ ] VPN droplet provisioned + `setup-wireguard.sh` run

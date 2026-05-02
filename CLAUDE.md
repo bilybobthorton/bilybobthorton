@@ -43,21 +43,9 @@ Update after every major session.
 
 ## Domain Name
 
-**Status:** No domain purchased yet. Using 159.65.237.42.nip.io for now.
-**Budget constraint:** Standard registration price only (~$10-15/yr). No aftermarket/broker purchases.
-**Brand preference:** Trevor likes "bastioncore" style — strong, technical, security-focused compounds.
-
-**Candidates to check on Namecheap (likely unregistered):**
-- `rampartcore.com` — rampart (defensive wall) + core
-- `wardcore.com` — ward (to guard/protect) + core
-- `vigilcore.com` — vigil + core
-- `bastionhq.com` — bastion + hq (bastioncore.com is taken)
-- `cipherwall.com` — cipher + wall
-- `hexshield.io` — hex + shield (.io is ~$35/yr, slightly pricier)
-- `ironbulwark.com` — iron + bulwark (a fortification)
-- `vaultcore.io` — vault + core
-
-**How to check:** Go to namecheap.com, search each name. Standard .com reg is ~$10-12/yr first year.
+**Status:** PURCHASED — `redgaurd.com` on Namecheap (Session 9, 2026-05-02)
+**Live domain:** https://redgaurd.com (pending TLS cert + deploy)
+**Shopify:** 3-month trial active — clarify use case (storefront vs marketing page vs billing)
 
 ---
 
@@ -74,7 +62,7 @@ Update after every major session.
 | Layer | Tech |
 |---|---|
 | Backend API | Python 3.11 + FastAPI + Uvicorn |
-| Analysis engine | pefile, yara-python, ssdeep, capstone, lief |
+| Analysis engine | pefile, yara-python, capstone, lief (ssdeep optional — no Py3.11 wheel) |
 | ML | scikit-learn RandomForest (train offline, load pkl) |
 | Task queue | Celery + Redis |
 | Database | PostgreSQL 16 (asyncpg async + psycopg2 sync for Celery) |
@@ -193,11 +181,16 @@ Email alert fires after scan if MALICIOUS or SUSPICIOUS and user has RESEND_API_
 ## Live VPS
 
 - **IP:** 159.65.237.42 (DigitalOcean, NYC, Ubuntu 22.04)
-- **Domain:** nip.io for now (`159.65.237.42.nip.io`) — buy real domain and swap
-- **Status:** server-setup.sh ran successfully; init-letsencrypt.sh not yet run (user was away from Mac)
+- **Domain:** redgaurd.com — PURCHASED on Namecheap (Session 9)
+- **Status:** server-setup.sh ran successfully; TLS cert not yet issued
 - **App dir:** `/opt/sentinelcore/sentinelcore/`
-- **To finish deploy:** SSH in, `bash scripts/init-letsencrypt.sh 159.65.237.42.nip.io kingtrevor981@gmail.com`
-- **To add email:** set `RESEND_API_KEY` + `APP_BASE_URL` in `.env`, restart worker
+- **Doubles as VPN node:** Run `scripts/setup-wireguard.sh` on this server to activate US East VPN location
+- **To finish deploy:**
+  1. Point Namecheap DNS A record → 159.65.237.42
+  2. SSH in: `bash scripts/init-letsencrypt.sh redgaurd.com kingtrevor981@gmail.com`
+  3. Update `.env`: `DOMAIN=redgaurd.com`, `APP_BASE_URL=https://redgaurd.com`
+  4. Restart: `make prod-down && make prod-up`
+- **After WireGuard setup:** set `VPN_SERVER_PUBLIC_KEY` + `VPN_SERVER_ENDPOINT=159.65.237.42:51820` in `.env`, restart API
 
 ---
 
@@ -246,8 +239,10 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 ## TODO / Next Up
 
 ### Near-term (pre-public launch)
-- [ ] **Finish VPS deploy** — SSH in, run init-letsencrypt.sh, verify stack is live
-- [ ] **Buy domain** — check Namecheap for cheap unregistered .com (see domain section below)
+- [ ] **Finish VPS deploy** — point redgaurd.com DNS → 159.65.237.42, run init-letsencrypt.sh, verify stack is live
+- [x] **Buy domain** — redgaurd.com purchased on Namecheap
+- [ ] **Clarify Shopify** — decide: storefront at redgaurd.com vs marketing page vs billing replacement
+- [ ] **Run WireGuard on app server** — SSH 159.65.237.42, run setup-wireguard.sh, set VPN_SERVER_* in .env
 - [ ] **Train real ML model** — MalwareBazaar + clean Windows binaries, run `make train-real`
 - [ ] **Dedicated repo** — move sentinelcore/ out of bilybobthorton/bilybobthorton
 - [x] **Auth UI** — /login, /register, /settings pages; JWT stored in localStorage; AuthNav component with avatar dropdown and logout
