@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getStoredEmail, getApiKey, getStoredTier, trialDaysLeft, isTrialActive, clearSession, isVerified, getToken } from "@/lib/auth";
-import { Copy, Check, ShieldAlert, Zap, CheckCircle, AlertCircle } from "lucide-react";
+import { getStoredEmail, getApiKey, getStoredTier, trialDaysLeft, isTrialActive, clearSession, isVerified, getToken, authHeaders } from "@/lib/auth";
+import { Copy, Check, ShieldAlert, Zap, CheckCircle, AlertCircle, Lock } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -15,6 +15,13 @@ export default function SettingsPage() {
   const [verified, setVerified] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent]     = useState(false);
+
+  const [currentPw, setCurrentPw]   = useState("");
+  const [newPw, setNewPw]           = useState("");
+  const [confirmPw, setConfirmPw]   = useState("");
+  const [pwSaving, setPwSaving]     = useState(false);
+  const [pwSuccess, setPwSuccess]   = useState(false);
+  const [pwError, setPwError]       = useState("");
 
   useEffect(() => {
     setEmail(getStoredEmail());
@@ -34,6 +41,32 @@ export default function SettingsPage() {
     });
     setResending(false);
     setResent(true);
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwError("");
+    setPwSuccess(false);
+    if (newPw !== confirmPw) { setPwError("New passwords don't match"); return; }
+    if (newPw.length < 8)    { setPwError("Password must be at least 8 characters"); return; }
+    setPwSaving(true);
+    try {
+      const r = await fetch(`${API}/api/v1/auth/change-password`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ current_password: currentPw, new_password: newPw }),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        setPwSuccess(true);
+        setCurrentPw(""); setNewPw(""); setConfirmPw("");
+        setTimeout(() => setPwSuccess(false), 4000);
+      } else {
+        setPwError(d.detail ?? "Failed to update password");
+      }
+    } finally {
+      setPwSaving(false);
+    }
   }
 
   function copyKey() {
@@ -129,6 +162,58 @@ export default function SettingsPage() {
           <a href="/dashboard" className="text-slate-400 hover:text-white transition-colors underline">Dashboard →</a>
           <a href="/webhooks"  className="text-slate-400 hover:text-white transition-colors underline">Webhooks →</a>
         </div>
+      </div>
+
+      {/* Change password */}
+      <div className="rounded-xl border border-slate-800 bg-[#0d0d14] p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <Lock size={15} className="text-slate-500" />
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Change Password</h2>
+        </div>
+        <form onSubmit={changePassword} className="space-y-3">
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Current password</label>
+            <input
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              required
+              className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">New password</label>
+              <input
+                type="password"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                required
+                minLength={8}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Confirm new password</label>
+              <input
+                type="password"
+                value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
+                required
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-slate-500"
+              />
+            </div>
+          </div>
+          {pwError   && <p className="text-xs text-red-400">{pwError}</p>}
+          {pwSuccess && <p className="text-xs text-green-400">Password updated successfully.</p>}
+          <button
+            type="submit"
+            disabled={pwSaving}
+            className="rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-colors px-4 py-2 text-sm font-semibold text-white"
+          >
+            {pwSaving ? "Saving…" : "Update password"}
+          </button>
+        </form>
       </div>
 
       {/* API Key */}

@@ -11,6 +11,7 @@ const endpoints = [
       { method: "POST", path: "/api/v1/auth/login",    desc: "Log in. Returns JWT + API key.", auth: false },
       { method: "GET",  path: "/api/v1/auth/verify-email?token=TOKEN", desc: "Verify email address via token from verification email.", auth: false },
       { method: "POST", path: "/api/v1/auth/resend-verification", desc: "Re-send verification email.", auth: true },
+      { method: "POST", path: "/api/v1/auth/change-password", desc: "Change account password. Body: { current_password, new_password }.", auth: true },
     ],
   },
   {
