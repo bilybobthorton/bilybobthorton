@@ -1,4 +1,6 @@
-import { Shield, Zap, Globe, Lock, Server, Eye, CheckCircle } from "lucide-react";
+"use client";
+import { Shield, Zap, Globe, Lock, Server, Eye, CheckCircle, Wifi } from "lucide-react";
+import { getToken } from "@/lib/auth";
 
 const FEATURES = [
   {
@@ -129,12 +131,21 @@ export default function VPNPage() {
             at the VPN gateway level, before they ever reach your device.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="/register"
-              className="rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors px-8 py-3 text-sm font-bold text-white"
-            >
-              Start free — no card required
-            </a>
+            {getToken() ? (
+              <a
+                href="/vpn/keys"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors px-8 py-3 text-sm font-bold text-white"
+              >
+                <Wifi size={16} /> Manage my devices
+              </a>
+            ) : (
+              <a
+                href="/register"
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-500 transition-colors px-8 py-3 text-sm font-bold text-white"
+              >
+                Start free — no card required
+              </a>
+            )}
             <a
               href="#pricing"
               className="rounded-xl border border-slate-700 hover:border-slate-500 transition-colors px-8 py-3 text-sm font-semibold text-slate-300"

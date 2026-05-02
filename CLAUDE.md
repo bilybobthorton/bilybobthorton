@@ -41,6 +41,26 @@ Update after every major session.
 
 ---
 
+## Domain Name
+
+**Status:** No domain purchased yet. Using 159.65.237.42.nip.io for now.
+**Budget constraint:** Standard registration price only (~$10-15/yr). No aftermarket/broker purchases.
+**Brand preference:** Trevor likes "bastioncore" style — strong, technical, security-focused compounds.
+
+**Candidates to check on Namecheap (likely unregistered):**
+- `rampartcore.com` — rampart (defensive wall) + core
+- `wardcore.com` — ward (to guard/protect) + core
+- `vigilcore.com` — vigil + core
+- `bastionhq.com` — bastion + hq (bastioncore.com is taken)
+- `cipherwall.com` — cipher + wall
+- `hexshield.io` — hex + shield (.io is ~$35/yr, slightly pricier)
+- `ironbulwark.com` — iron + bulwark (a fortification)
+- `vaultcore.io` — vault + core
+
+**How to check:** Go to namecheap.com, search each name. Standard .com reg is ~$10-12/yr first year.
+
+---
+
 ## Repo & Branch
 
 **Repo:** bilybobthorton/bilybobthorton (move to dedicated repo eventually)
@@ -227,15 +247,20 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 
 ### Near-term (pre-public launch)
 - [ ] **Finish VPS deploy** — SSH in, run init-letsencrypt.sh, verify stack is live
-- [ ] **Buy domain** — sentinelguard.com recommended (see domain section); swap nip.io config
+- [ ] **Buy domain** — check Namecheap for cheap unregistered .com (see domain section below)
 - [ ] **Train real ML model** — MalwareBazaar + clean Windows binaries, run `make train-real`
 - [ ] **Dedicated repo** — move sentinelcore/ out of bilybobthorton/bilybobthorton
 - [x] **Auth UI** — /login, /register, /settings pages; JWT stored in localStorage; AuthNav component with avatar dropdown and logout
 - [x] **Email verification** — token on register, verify-email page, resend endpoint, settings status badge
 - [x] **Webhooks** — CRUD + HMAC-signed delivery + test endpoint (Pro+), fires on scan completion
 - [x] **VPN key API** — WireGuard keypair generation, device limits by tier, config download
+- [x] **VPN device management UI** — /vpn/keys: add/revoke devices, download .conf, setup guide
+- [x] **WireGuard server setup script** — scripts/setup-wireguard.sh: one-command droplet provisioning
+- [x] **Linux agent installer** — agent/install/linux/install.sh: curl-pipe install, systemd service, auto-arch detection
 - [x] **Usage dashboard** — /dashboard: scan counts, threat breakdown, 14-day spark chart, quota bar
 - [x] **API docs page** — /api-docs: full endpoint reference, rate limits table, auth examples
+- [x] **Scan history UI** — /history: paginated table with threat badges
+- [x] **Webhook notifications** — CRUD + HMAC-signed delivery
 
 ### Detection capability roadmap
 - [ ] **Memory analysis** — analyze process memory dumps for malware indicators:
@@ -256,21 +281,18 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - [ ] **Windows agent signing** — code-sign the binary for SmartScreen/AV compatibility
 
 ### SentinelVPN (infrastructure)
-- [ ] **WireGuard server provisioning** — DigitalOcean droplets per region, wg0 config generation per user
-- [ ] **VPN user management API** — generate WireGuard keypairs, store public key in DB, serve config file download
-- [ ] **VPN client apps** — package WireGuard configs into platform-specific apps (Windows/macOS installer, iOS/Android profile)
+- [x] **WireGuard server setup** — scripts/setup-wireguard.sh provisions a droplet in one command
+- [x] **VPN key API** — generate WireGuard keypairs, store in DB, serve .conf download, device limits by tier
+- [x] **VPN device management UI** — /vpn/keys frontend with CRUD, config preview, download, setup guide
+- [ ] **Provision 2 VPN droplets** — buy DO droplets, run setup-wireguard.sh, set VPN_SERVER_* in .env
 - [ ] **Threat-aware DNS resolver** — block known C2 domains at the DNS layer using SentinelCore's IOC feed
 - [ ] **Bandwidth metering** — track per-user usage against tier limits (free = 10 GB/mo)
 - [ ] **VPN kill switch** — iptables/nftables rule generation for Linux; per-platform instructions for Windows/macOS
 
 ### Growth / business
-- [ ] **Email verification** — verify email on register (Resend already wired in)
-- [ ] **Scan history UI** — /history page showing past scans per user
-- [ ] **Usage dashboard** — show quota used, scans over time, threat breakdown
 - [ ] **MISP integration UI** — Enterprise dashboard page to configure + test MISP push
-- [ ] **Webhook notifications** — POST scan results to user-configured URLs (Slack, Teams, SIEM)
-- [ ] **API docs page** — public-facing API reference for Enterprise customers
 - [ ] **Windows agent MSI** — WiX-based MSI alongside NSIS for enterprise MDM deployment
+- [ ] **macOS agent** — extend Rust agent for macOS
 
 ---
 
@@ -325,6 +347,15 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Built SentinelVPN product (`/vpn` page): hero, AV-vs-VPN coverage comparison table, 6 feature cards (WireGuard, zero-log, threat-aware routing, kill switch, DNS leak protection, global servers), 4-tier pricing (Free/Pro/Bundle/Enterprise), CTA
 - Added VPN teaser banner to main landing page (indigo accent, bundle pitch, links to /vpn)
 - Added VPN nav link (indigo color, distinct from main nav items)
+
+### Session 8 — 2026-05-02
+- VPN device management UI: /vpn/keys page with add/revoke/download, setup guide, device limit bar
+- WireGuard server provisioning script: scripts/setup-wireguard.sh (one-command droplet setup, keypair gen, NAT, UFW, systemd)
+- Linux agent installer: agent/install/linux/install.sh (curl-pipe install, auto-arch detection, systemd service, hardened unit file, uninstall flag)
+- .env.example: added VPN_SERVER_PUBLIC_KEY, VPN_SERVER_ENDPOINT, VPN_DNS vars
+- VPN page (/vpn): "Manage my devices" CTA when authenticated vs "Start free" for guests; added Wifi icon
+- Nav: added "Devices" link next to "VPN" for quick access to /vpn/keys
+- CLAUDE.md: cleaned up stale TODOs, updated session log
 
 ### Session 7 — 2026-05-02
 - Fixed Rust clippy -D warnings (sysinfo 0.30.x API, unreachable cfg patterns, dead_code, while-let style, format string)
