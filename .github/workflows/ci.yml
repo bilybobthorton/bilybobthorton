@@ -61,7 +61,7 @@ jobs:
 
       - name: Lint with ruff
         run: |
-          pip install ruff
+          pip install "ruff==0.15.12"
           ruff check api/ engine/ --ignore E501
 
       - name: Run Alembic migrations
