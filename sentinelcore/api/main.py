@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.config import get_settings
 from api.routes import health, scan
 from api.routes import auth, agent, admin, billing, yara_rules, ml, report, enterprise
+from api.routes import webhooks, vpn, stats
 
 settings = get_settings()
 
@@ -17,7 +18,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        settings.app_base_url,
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,3 +37,6 @@ app.include_router(yara_rules.router)
 app.include_router(ml.router)
 app.include_router(report.router)
 app.include_router(enterprise.router)
+app.include_router(webhooks.router)
+app.include_router(vpn.router)
+app.include_router(stats.router)

@@ -1,8 +1,9 @@
-const TOKEN_KEY = "sc_token";
-const EMAIL_KEY = "sc_email";
-const APIKEY_KEY = "sc_apikey";
-const TIER_KEY = "sc_tier";
-const TRIAL_KEY = "sc_trial_ends";
+const TOKEN_KEY    = "sc_token";
+const EMAIL_KEY    = "sc_email";
+const APIKEY_KEY   = "sc_apikey";
+const TIER_KEY     = "sc_tier";
+const TRIAL_KEY    = "sc_trial_ends";
+const VERIFIED_KEY = "sc_verified";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
@@ -43,23 +44,30 @@ export function trialDaysLeft(): number | null {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+export function isVerified(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(VERIFIED_KEY) === "true";
+}
+
 export function storeSession(
   token: string,
   email: string,
   apiKey: string,
   tier = "free",
   trialEndsAt: string | null = null,
+  verified = false,
 ) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(EMAIL_KEY, email);
   localStorage.setItem(APIKEY_KEY, apiKey);
   localStorage.setItem(TIER_KEY, tier);
+  localStorage.setItem(VERIFIED_KEY, String(verified));
   if (trialEndsAt) localStorage.setItem(TRIAL_KEY, trialEndsAt);
   else localStorage.removeItem(TRIAL_KEY);
 }
 
 export function clearSession() {
-  [TOKEN_KEY, EMAIL_KEY, APIKEY_KEY, TIER_KEY, TRIAL_KEY].forEach((k) =>
+  [TOKEN_KEY, EMAIL_KEY, APIKEY_KEY, TIER_KEY, TRIAL_KEY, VERIFIED_KEY].forEach((k) =>
     localStorage.removeItem(k),
   );
 }
@@ -78,6 +86,7 @@ export interface AuthResponse {
   api_key: string;
   tier: string;
   trial_ends_at?: string | null;
+  is_verified?: boolean;
 }
 
 export async function apiRegister(email: string, password: string): Promise<AuthResponse> {

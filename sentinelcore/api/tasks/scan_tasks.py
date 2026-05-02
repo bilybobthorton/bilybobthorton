@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from api.config import get_settings
 from api.models.scan import ScanJob, User
+from api.models.webhook import WebhookEndpoint
 from api.services.email import send_scan_alert
 from api.tasks.celery_app import celery_app
 from urllib.parse import urlparse
@@ -52,6 +53,45 @@ def _run_async(coro):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
+
+
+def _fire_webhooks(user_id: str, event: str, payload: dict) -> None:
+    import hashlib
+    import hmac as hmac_lib
+    import requests as req_lib
+
+    try:
+        with _get_session() as db:
+            rows = db.execute(
+                select(WebhookEndpoint).where(
+                    WebhookEndpoint.user_id == uuid.UUID(user_id),
+                    WebhookEndpoint.is_active.is_(True),
+                )
+            ).scalars().all()
+        for endpoint in rows:
+            events = (endpoint.events or "").split(",")
+            if event not in events and "scan.complete" not in events:
+                continue
+            body = json.dumps({**payload, "event": event})
+            sig = "sha256=" + hmac_lib.new(
+                endpoint.secret.encode(), body.encode(), hashlib.sha256
+            ).hexdigest()
+            try:
+                req_lib.post(
+                    endpoint.url,
+                    data=body,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-Sentinel-Signature": sig,
+                        "X-Sentinel-Event": event,
+                        "User-Agent": "SentinelCore-Webhook/1.0",
+                    },
+                    timeout=8,
+                )
+            except Exception as e:
+                logger.warning("Webhook delivery failed to %s: %s", endpoint.url, e)
+    except Exception as e:
+        logger.warning("Webhook dispatch error: %s", e)
 
 
 def _get_user_email(user_id: str) -> str | None:
@@ -295,6 +335,20 @@ def run_scan(self, scan_id: str, file_path: str, filename: str, user_id: str | N
                 )
             )
             db.commit()
+
+        # ── Webhook notifications ─────────────────────────────────────────────
+        if user_id:
+            webhook_payload = {
+                "scan_id": scan_id,
+                "filename": filename,
+                "sha256": sha256,
+                "threat_level": result.threat_level.value,
+                "confidence": round(result.confidence, 4),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            event = f"scan.{result.threat_level.value}"  # scan.malicious / scan.suspicious / scan.clean
+            _fire_webhooks(user_id, event, webhook_payload)
+            _fire_webhooks(user_id, "scan.complete", webhook_payload)
 
         # ── Email notification ────────────────────────────────────────────────
         # Send alert to the scanning user if the file is malicious or suspicious.

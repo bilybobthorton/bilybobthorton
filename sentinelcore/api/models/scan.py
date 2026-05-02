@@ -1,7 +1,7 @@
 import uuid
 from enum import Enum
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase
 
@@ -34,6 +34,8 @@ class User(Base):
     scans_today = Column(Integer, default=0)
     scans_reset_at = Column(DateTime(timezone=True))
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

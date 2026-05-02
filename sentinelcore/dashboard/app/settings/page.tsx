@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getStoredEmail, getApiKey, getStoredTier, trialDaysLeft, isTrialActive, clearSession } from "@/lib/auth";
-import { Copy, Check, ShieldAlert, Zap } from "lucide-react";
+import { getStoredEmail, getApiKey, getStoredTier, trialDaysLeft, isTrialActive, clearSession, isVerified, getToken } from "@/lib/auth";
+import { Copy, Check, ShieldAlert, Zap, CheckCircle, AlertCircle } from "lucide-react";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function SettingsPage() {
   const [email, setEmail]       = useState<string | null>(null);
@@ -10,6 +12,9 @@ export default function SettingsPage() {
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [onTrial, setOnTrial]   = useState(false);
   const [copied, setCopied]     = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent]     = useState(false);
 
   useEffect(() => {
     setEmail(getStoredEmail());
@@ -17,7 +22,19 @@ export default function SettingsPage() {
     setTier(getStoredTier());
     setDaysLeft(trialDaysLeft());
     setOnTrial(isTrialActive());
+    setVerified(isVerified());
   }, []);
+
+  async function resendVerification() {
+    setResending(true);
+    const token = getToken();
+    await fetch(`${API}/api/v1/auth/resend-verification`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    setResending(false);
+    setResent(true);
+  }
 
   function copyKey() {
     if (!apiKey) return;
@@ -81,11 +98,36 @@ export default function SettingsPage() {
               {tier}{onTrial ? <span className="ml-1.5 text-xs text-amber-400">(trial)</span> : null}
             </p>
           </div>
+          <div>
+            <p className="text-xs text-slate-500 mb-1">Email status</p>
+            {verified ? (
+              <p className="flex items-center gap-1.5 text-sm text-green-400">
+                <CheckCircle size={13} /> Verified
+              </p>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="flex items-center gap-1.5 text-sm text-amber-400">
+                  <AlertCircle size={13} /> Not verified
+                </p>
+                {resent ? (
+                  <span className="text-xs text-green-400">Email sent!</span>
+                ) : (
+                  <button
+                    onClick={resendVerification}
+                    disabled={resending}
+                    className="text-xs text-slate-400 hover:text-white underline transition-colors"
+                  >
+                    {resending ? "Sending…" : "Resend verification"}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-        <div>
-          <a href="/history" className="text-xs text-slate-400 hover:text-white transition-colors underline">
-            View scan history →
-          </a>
+        <div className="flex gap-4 text-xs">
+          <a href="/history"   className="text-slate-400 hover:text-white transition-colors underline">Scan history →</a>
+          <a href="/dashboard" className="text-slate-400 hover:text-white transition-colors underline">Dashboard →</a>
+          <a href="/webhooks"  className="text-slate-400 hover:text-white transition-colors underline">Webhooks →</a>
         </div>
       </div>
 

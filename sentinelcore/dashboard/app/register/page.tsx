@@ -33,7 +33,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const data = await apiRegister(email, password);
-      storeSession(data.access_token, email, data.api_key, data.tier, data.trial_ends_at ?? null);
+      storeSession(data.access_token, email, data.api_key, data.tier, data.trial_ends_at ?? null, data.is_verified ?? false);
       window.location.href = "/scan";
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");

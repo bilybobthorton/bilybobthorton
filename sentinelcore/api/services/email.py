@@ -133,6 +133,81 @@ def _build_text(
     return "\n".join(lines)
 
 
+async def send_verification_email(
+    *,
+    to_email: str,
+    token: str,
+    base_url: str,
+    api_key: str,
+    from_email: str,
+) -> bool:
+    if not api_key:
+        return False
+
+    verify_url = f"{base_url.rstrip('/')}/verify-email?token={token}"
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:40px 20px;">
+      <table width="520" cellpadding="0" cellspacing="0"
+             style="background:#0d0d14;border:1px solid #1e293b;border-radius:12px;overflow:hidden;">
+        <tr><td style="padding:24px 32px;border-bottom:1px solid #1e293b;">
+          <table cellpadding="0" cellspacing="0"><tr>
+            <td style="width:28px;height:28px;background:#dc2626;border-radius:6px;text-align:center;vertical-align:middle;">
+              <span style="color:#fff;font-weight:700;font-size:11px;">SC</span>
+            </td>
+            <td style="padding-left:10px;color:#fff;font-weight:600;font-size:15px;">SentinelCore</td>
+          </tr></table>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#fff;">Verify your email</p>
+          <p style="margin:0 0 24px;font-size:14px;color:#94a3b8;line-height:1.6;">
+            Click the button below to verify your email address and activate your SentinelCore account.
+            This link expires in 24 hours.
+          </p>
+          <a href="{verify_url}"
+             style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;
+                    font-weight:600;font-size:14px;padding:12px 28px;border-radius:8px;">
+            Verify email address →
+          </a>
+          <p style="margin:24px 0 0;font-size:12px;color:#475569;">
+            Or paste this link: <span style="color:#64748b;font-family:monospace;word-break:break-all;">{verify_url}</span>
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 32px;border-top:1px solid #1e293b;">
+          <p style="margin:0;font-size:12px;color:#475569;">If you didn't create a SentinelCore account, you can safely ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": "Verify your SentinelCore email",
+        "html": html,
+        "text": f"SentinelCore — Verify your email\n\nClick here: {verify_url}\n\nIf you didn't sign up, ignore this email.",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(
+                RESEND_API_URL,
+                json=payload,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+            r.raise_for_status()
+            logger.info("Verification email sent to %s", to_email)
+            return True
+    except Exception as exc:
+        logger.warning("Failed to send verification email: %s", exc)
+        return False
+
+
 async def send_scan_alert(
     *,
     to_email: str,
