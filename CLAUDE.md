@@ -70,7 +70,7 @@ Update after every major session.
 
 ---
 
-## What Is Built (as of Session 6)
+## What Is Built (as of Session 7)
 
 ### Python Engine (`sentinelcore/engine/`)
 - `static/hasher.py` — streaming MD5/SHA1/SHA256/ssdeep
@@ -203,6 +203,10 @@ STRIPE_PRICE_ENTERPRISE=price_...
 MISP_URL=https://your-misp.example.com   # Enterprise only
 MISP_KEY=...
 MISP_VERIFY_SSL=true
+# VPN server (set after provisioning WireGuard on droplet)
+VPN_SERVER_PUBLIC_KEY=...   # wg pubkey < /etc/wireguard/server_private.key
+VPN_SERVER_ENDPOINT=vpn1.yourdomain.com:51820
+VPN_DNS=1.1.1.1, 1.0.0.1
 ```
 
 ---
@@ -223,10 +227,15 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 
 ### Near-term (pre-public launch)
 - [ ] **Finish VPS deploy** — SSH in, run init-letsencrypt.sh, verify stack is live
-- [ ] **Buy domain** — sentinelcore.io or similar; swap nip.io config
+- [ ] **Buy domain** — sentinelguard.com recommended (see domain section); swap nip.io config
 - [ ] **Train real ML model** — MalwareBazaar + clean Windows binaries, run `make train-real`
 - [ ] **Dedicated repo** — move sentinelcore/ out of bilybobthorton/bilybobthorton
 - [x] **Auth UI** — /login, /register, /settings pages; JWT stored in localStorage; AuthNav component with avatar dropdown and logout
+- [x] **Email verification** — token on register, verify-email page, resend endpoint, settings status badge
+- [x] **Webhooks** — CRUD + HMAC-signed delivery + test endpoint (Pro+), fires on scan completion
+- [x] **VPN key API** — WireGuard keypair generation, device limits by tier, config download
+- [x] **Usage dashboard** — /dashboard: scan counts, threat breakdown, 14-day spark chart, quota bar
+- [x] **API docs page** — /api-docs: full endpoint reference, rate limits table, auth examples
 
 ### Detection capability roadmap
 - [ ] **Memory analysis** — analyze process memory dumps for malware indicators:
@@ -316,6 +325,17 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Built SentinelVPN product (`/vpn` page): hero, AV-vs-VPN coverage comparison table, 6 feature cards (WireGuard, zero-log, threat-aware routing, kill switch, DNS leak protection, global servers), 4-tier pricing (Free/Pro/Bundle/Enterprise), CTA
 - Added VPN teaser banner to main landing page (indigo accent, bundle pitch, links to /vpn)
 - Added VPN nav link (indigo color, distinct from main nav items)
+
+### Session 7 — 2026-05-02
+- Fixed Rust clippy -D warnings (sysinfo 0.30.x API, unreachable cfg patterns, dead_code, while-let style, format string)
+- Email verification: `is_verified` + `verification_token` on User (migration 0005), verify-email route, resend endpoint, Resend email template, /verify-email frontend page, Settings badge + resend button
+- Webhooks: migration 0006, `webhook_endpoints` table, CRUD API + HMAC-signed delivery + test endpoint (Pro+ only), fires from scan_tasks.py on completion, /webhooks frontend page with secret copy + test button
+- VPN key API: migration 0007, `vpn_keys` table, X25519 keypair generation, preshared key, device limits by tier (Free 1 / Pro 5 / Enterprise 25), WireGuard .conf download, /api/v1/vpn/* routes
+- Usage dashboard: /dashboard page with scan counts (today/week/month), daily quota bar, threat breakdown bars, 14-day SVG spark chart, quick links
+- API docs: /api-docs static page with full endpoint reference, method color chips, rate limits table, auth examples, webhook payload schema
+- New /api/v1/stats/me endpoint with 14-day daily counts grouped by day (PostgreSQL date_trunc)
+- Config: VPN_SERVER_PUBLIC_KEY, VPN_SERVER_ENDPOINT, VPN_DNS env vars; CORS allows app_base_url
+- Dashboard nav: added Dashboard link; Settings page: email status badge, links to dashboard/webhooks
 
 ### Session 6 — 2026-05-01
 - Fixed all CI failures: E402 docstring ordering in 3 Python files, moved asynccontextmanager import in database.py, auto-fixed 14 F401 unused imports, fixed 3 E712 SQLAlchemy `== True` → `.is_(True)`; ran `cargo fmt` across all Rust source files
