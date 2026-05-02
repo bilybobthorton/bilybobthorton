@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ShieldAlert, ShieldCheck, AlertTriangle, Activity, BarChart2 } from "lucide-react";
-import { getToken, getStoredTier } from "@/lib/auth";
+import { getToken, getStoredTier, authHeaders } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -14,11 +14,6 @@ interface Stats {
   quota_limit: number;
   threat_breakdown: { malicious: number; suspicious: number; clean: number };
   daily_counts: DailyCount[];
-}
-
-function authHeaders() {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -220,15 +215,6 @@ function ThreatRow({
         <span className="text-slate-400">{count} ({pct}%)</span>
       </div>
       <MiniBar value={count} max={total} color={color} />
-    </div>
-  );
-}
-
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
-  return (
-    <div className="h-1.5 w-full rounded-full bg-slate-800">
-      <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }

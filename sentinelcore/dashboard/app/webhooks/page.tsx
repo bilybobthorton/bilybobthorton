@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Zap, ShieldAlert, CheckCircle, XCircle, Copy, Check } from "lucide-react";
-import { getToken, getStoredTier } from "@/lib/auth";
+import { getToken, getStoredTier, authHeaders } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -12,11 +12,6 @@ interface Webhook {
   is_active: boolean;
   secret: string;
   created_at: string;
-}
-
-function authHeaders() {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export default function WebhooksPage() {

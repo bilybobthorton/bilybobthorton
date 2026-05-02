@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Download, Copy, Check, ShieldAlert, Zap, Wifi } from "lucide-react";
-import { getToken, getStoredTier } from "@/lib/auth";
+import { getToken, getStoredTier, authHeaders } from "@/lib/auth";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -20,11 +20,6 @@ interface VpnKeyCreated extends VpnKey {
 }
 
 const DEVICE_LIMITS: Record<string, number> = { free: 1, pro: 5, enterprise: 25 };
-
-function authHeaders() {
-  const t = getToken();
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
 
 export default function VpnKeysPage() {
   const [keys, setKeys] = useState<VpnKey[]>([]);
