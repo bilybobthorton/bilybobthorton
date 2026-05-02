@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="{{ request.locale.iso_code }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07070e">
+  <title>
+    {{ page_title }}
+    {%- if page_title != shop.name %} — {{ shop.name }}{% endif %}
+  </title>
+  {% if page_description %}
+    <meta name="description" content="{{ page_description | escape }}">
+  {% endif %}
+  {{ content_for_header }}
+  {{ 'theme.css' | asset_url | stylesheet_tag }}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  {%- assign app_url = 'https://app.redgaurd.com' -%}
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a href="{{ routes.root_url }}" class="logo">
+        <svg class="logo-hex" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L21.5 7.5V16.5L12 22L2.5 16.5V7.5L12 2Z" stroke="#6366f1" stroke-width="1.5" fill="none"/>
+          <path d="M12 6L17.5 9.25V15.75L12 19L6.5 15.75V9.25L12 6Z" fill="#6366f1" opacity="0.3"/>
+          <circle cx="12" cy="12" r="2.5" fill="#6366f1"/>
+        </svg>
+        <span class="logo-text">RedGuard</span>
+      </a>
+
+      <nav class="site-nav" id="site-nav">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#detection" class="nav-link">Detection</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
+        <a href="#vpn" class="nav-link">VPN</a>
+        <a href="{{ app_url }}/api-docs" class="nav-link" target="_blank" rel="noopener">API Docs</a>
+      </nav>
+
+      <div class="header-actions">
+        <a href="{{ app_url }}/login" class="btn btn-ghost">Log in</a>
+        <a href="{{ app_url }}/register" class="btn btn-primary">Get started</a>
+      </div>
+
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main-content">
+    {{ content_for_layout }}
+  </main>
+
+  {{ 'theme.js' | asset_url | script_tag }}
+</body>
+</html>

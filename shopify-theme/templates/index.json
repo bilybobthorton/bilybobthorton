@@ -1,0 +1,46 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "settings": {}
+    },
+    "stats": {
+      "type": "stats-bar",
+      "settings": {}
+    },
+    "detection": {
+      "type": "detection-layers",
+      "settings": {}
+    },
+    "features": {
+      "type": "features-grid",
+      "settings": {}
+    },
+    "how-it-works": {
+      "type": "how-it-works",
+      "settings": {}
+    },
+    "vpn": {
+      "type": "vpn-banner",
+      "settings": {}
+    },
+    "pricing": {
+      "type": "pricing",
+      "settings": {}
+    },
+    "final-cta": {
+      "type": "final-cta",
+      "settings": {}
+    }
+  },
+  "order": [
+    "hero",
+    "stats",
+    "detection",
+    "features",
+    "how-it-works",
+    "vpn",
+    "pricing",
+    "final-cta"
+  ]
+}

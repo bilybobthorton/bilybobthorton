@@ -1,0 +1,100 @@
+<section class="section detection-section" id="detection">
+  <div class="container">
+    <div class="section-header">
+      <p class="section-eyebrow">Detection Engine</p>
+      <h2 class="section-title">Five layers that catch what<br>single-engine scanners miss</h2>
+      <p class="section-subtitle">Each layer feeds the next. A file that slips past Layer 1 gets caught by ML, then VT, then OTX, then behavioral heuristics.</p>
+    </div>
+
+    <div class="detection-layers">
+      <div class="layer-card">
+        <div class="layer-number">01</div>
+        <div class="layer-content">
+          <div class="layer-header">
+            <span class="layer-badge badge-instant">Instant</span>
+            <h3>Local Hash Database</h3>
+          </div>
+          <p>SHA256 blocklist of known malware families — WannaCry, NotPetya, Emotet and thousands more. Zero-latency match before any network call.</p>
+          <div class="layer-tech">
+            <span class="tech-tag">SHA256</span>
+            <span class="tech-tag">MD5</span>
+            <span class="tech-tag">Blocklist</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-number">02</div>
+        <div class="layer-content">
+          <div class="layer-header">
+            <span class="layer-badge badge-ml">ML</span>
+            <h3>Machine Learning Engine</h3>
+          </div>
+          <p>Random Forest classifier trained on 31 PE features: section entropy, import table structure, overlay size, entry point anomalies, and more.</p>
+          <div class="layer-tech">
+            <span class="tech-tag">RandomForest</span>
+            <span class="tech-tag">31 Features</span>
+            <span class="tech-tag">PE Analysis</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-number">03</div>
+        <div class="layer-content">
+          <div class="layer-header">
+            <span class="layer-badge badge-vt">Intel</span>
+            <h3>VirusTotal Cross-Check</h3>
+          </div>
+          <p>Hash lookup across 70+ antivirus engines simultaneously. Confirmed hits are automatically added to your local blocklist for instant future matches.</p>
+          <div class="layer-tech">
+            <span class="tech-tag">70+ Engines</span>
+            <span class="tech-tag">Hash Lookup</span>
+            <span class="tech-tag">Auto-block</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer-card">
+        <div class="layer-number">04</div>
+        <div class="layer-content">
+          <div class="layer-header">
+            <span class="layer-badge badge-otx">Threat Intel</span>
+            <h3>OTX IOC Enrichment</h3>
+          </div>
+          <p>Cross-references file hashes, extracted IPs, domains, and URLs against AlienVault OTX threat pulses from the global security community.</p>
+          <div class="layer-tech">
+            <span class="tech-tag">AlienVault OTX</span>
+            <span class="tech-tag">IP Reputation</span>
+            <span class="tech-tag">Domain Intel</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer-card layer-card-wide">
+        <div class="layer-number">05</div>
+        <div class="layer-content">
+          <div class="layer-header">
+            <span class="layer-badge badge-heuristics">MITRE</span>
+            <h3>Behavioral Heuristics</h3>
+          </div>
+          <p>15+ rule categories mapped to MITRE ATT&CK — process injection (T1055), ransomware patterns (T1486), LSASS credential dumping (T1003.001), sandbox evasion (T1497), keyloggers, persistence, and more. Each hit is tagged with technique and tactic.</p>
+          <div class="layer-tech">
+            <span class="tech-tag">T1055 Injection</span>
+            <span class="tech-tag">T1486 Ransomware</span>
+            <span class="tech-tag">T1003 Cred Dump</span>
+            <span class="tech-tag">T1497 Evasion</span>
+            <span class="tech-tag">+11 more</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Detection Layers",
+  "settings": []
+}
+{% endschema %}

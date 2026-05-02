@@ -1,0 +1,39 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "RedGuard",
+    "theme_version": "1.0.0",
+    "theme_author": "RedGuard",
+    "theme_documentation_url": "https://redgaurd.com",
+    "theme_support_url": "mailto:support@redgaurd.com"
+  },
+  {
+    "name": "Colors",
+    "settings": [
+      {
+        "type": "color",
+        "id": "accent_color",
+        "label": "Accent Color",
+        "default": "#6366f1"
+      },
+      {
+        "type": "color",
+        "id": "background_color",
+        "label": "Background Color",
+        "default": "#07070e"
+      }
+    ]
+  },
+  {
+    "name": "App",
+    "settings": [
+      {
+        "type": "text",
+        "id": "app_url",
+        "label": "App URL",
+        "default": "https://app.redgaurd.com",
+        "info": "Base URL for the SentinelCore dashboard (login, register, scan)"
+      }
+    ]
+  }
+]
