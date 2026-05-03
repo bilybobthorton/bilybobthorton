@@ -75,7 +75,7 @@ const endpoints = [
     ],
   },
   {
-    section: "SentinelVPN",
+    section: "RedGuard VPN",
     icon: <Zap size={16} />,
     items: [
       { method: "GET",    path: "/api/v1/vpn/keys",              desc: "List your WireGuard device keys.", auth: true },
@@ -109,7 +109,7 @@ export default function ApiDocsPage() {
         <h1 className="text-3xl font-bold text-white">API Reference</h1>
         <p className="text-slate-400 max-w-2xl">
           REST API for SentinelCore malware scanning, threat intel, YARA rules, endpoint agent
-          ingestion, webhooks, and SentinelVPN key management.
+          ingestion, webhooks, and RedGuard VPN key management.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <div className="rounded-lg border border-slate-700 bg-[#0d0d14] px-4 py-2.5 text-sm">

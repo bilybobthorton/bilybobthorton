@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# SentinelVPN — WireGuard Node Setup Script
+# RedGuard VPN — WireGuard Node Setup Script
 # Run this on each VPN droplet (Ubuntu 22.04 / Debian 12).
 # Tested on DigitalOcean $6/mo basic droplet (1 vCPU, 1 GB RAM).
 #
@@ -132,7 +132,7 @@ chmod +x /usr/local/bin/wg-add-peer
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GRN}══════════════════════════════════════════════════════════${NC}"
-echo -e "${GRN}  SentinelVPN WireGuard node is ready!${NC}"
+echo -e "${GRN}  RedGuard VPN WireGuard node is ready!${NC}"
 echo -e "${GRN}══════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  Server IP      : ${YLW}${SERVER_IP}${NC}"

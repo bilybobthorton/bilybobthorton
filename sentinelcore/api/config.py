@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_price_enterprise: str = ""
 
-    # SentinelVPN — WireGuard server config
+    # RedGuard VPN — WireGuard server config
     vpn_server_public_key: str = ""   # wg pubkey < /etc/wireguard/server_private.key
     vpn_server_endpoint: str = ""     # e.g. vpn1.redgaurd.com:51820
     vpn_dns: str = "1.1.1.1, 1.0.0.1"

@@ -265,7 +265,7 @@ export default function VpnKeysPage() {
           </div>
           <div className="flex gap-3">
             <span className="text-slate-600 font-mono w-4 shrink-0">4.</span>
-            <span>All traffic is encrypted and routed through SentinelVPN. DNS is protected against C2 domain leakage.</span>
+            <span>All traffic is encrypted and routed through RedGuard VPN. DNS is protected against C2 domain leakage.</span>
           </div>
         </div>
       </div>

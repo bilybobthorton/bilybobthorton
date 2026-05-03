@@ -121,7 +121,7 @@ export default function VPNPage() {
             Now in beta · Free during launch
           </div>
           <h1 className="text-5xl sm:text-6xl font-bold text-white leading-tight tracking-tight mb-4">
-            SentinelVPN
+            RedGuard VPN
           </h1>
           <p className="text-lg text-slate-400 leading-relaxed mb-3">
             Privacy protection built by a cybersecurity operator — not a marketing team.
@@ -171,7 +171,7 @@ export default function VPNPage() {
           </h2>
           <p className="text-slate-400 max-w-2xl mx-auto mb-10 text-sm leading-relaxed">
             Most threats in 2025 don&apos;t require a malicious file — they use your IP, your ISP&apos;s DNS,
-            and your unencrypted traffic. SentinelVPN closes the gap that antivirus can&apos;t reach.
+            and your unencrypted traffic. RedGuard VPN closes the gap that antivirus can&apos;t reach.
             Together, they form a full-stack defense layer.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
@@ -218,7 +218,7 @@ export default function VPNPage() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-white mb-3">Simple pricing</h2>
-            <p className="text-slate-400">Bundle SentinelVPN + SentinelCore and save 30% vs buying separately.</p>
+            <p className="text-slate-400">Bundle RedGuard VPN + SentinelCore and save 30% vs buying separately.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {PLANS.map((plan) => (
@@ -275,7 +275,7 @@ export default function VPNPage() {
             Full-stack protection starts free.
           </h2>
           <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-            SentinelCore catches what&apos;s already on your device. SentinelVPN secures what&apos;s going in and out.
+            SentinelCore catches what&apos;s already on your device. RedGuard VPN secures what&apos;s going in and out.
             Together, they&apos;re a complete threat response platform.
           </p>
           <a
