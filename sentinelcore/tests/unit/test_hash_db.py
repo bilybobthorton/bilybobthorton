@@ -1,6 +1,5 @@
 """Unit tests for local hash reputation DB."""
 import pytest
-import pytest_asyncio
 from engine.intel import hash_db
 
 

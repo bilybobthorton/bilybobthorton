@@ -1,8 +1,7 @@
 """Unit tests for the static analysis orchestrator."""
 import pytest
-from pathlib import Path
 from engine.static.analyzer import analyze_file
-from engine.static.models import ThreatLevel, FileType
+from engine.static.models import ThreatLevel
 
 
 def test_analyze_text_file(tmp_path):

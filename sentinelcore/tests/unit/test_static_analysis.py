@@ -1,11 +1,9 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 
 from engine.static.hasher import compute_hashes
 from engine.static.strings_extractor import extract_strings
-from engine.static.models import ThreatLevel
 
 
 def _write_temp(content: bytes) -> Path:

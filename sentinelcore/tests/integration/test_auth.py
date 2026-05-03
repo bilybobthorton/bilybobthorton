@@ -1,6 +1,5 @@
 """Integration tests for auth routes."""
 import pytest
-import pytest_asyncio
 
 
 @pytest.mark.asyncio

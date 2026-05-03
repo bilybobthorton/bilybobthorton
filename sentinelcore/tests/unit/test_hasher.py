@@ -1,6 +1,4 @@
 """Unit tests for file hashing."""
-from pathlib import Path
-import pytest
 from engine.static.hasher import compute_hashes
 
 

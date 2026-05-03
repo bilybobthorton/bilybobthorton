@@ -26,8 +26,8 @@ os.environ.setdefault("STRIPE_SECRET_KEY", "")
 os.environ.setdefault("VIRUSTOTAL_API_KEY", "")
 os.environ.setdefault("OTX_API_KEY", "")
 
-from api.models.scan import Base, User
-from api.auth.jwt import hash_password, create_access_token, generate_api_key
+from api.models.scan import Base, User  # noqa: E402
+from api.auth.jwt import hash_password, create_access_token, generate_api_key  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -128,9 +128,9 @@ def sample_pe_bytes() -> bytes:
     coff = (
         b"\x4c\x01"   # Machine: i386
         b"\x01\x00"   # NumberOfSections: 1
-        b"\x00" * 12  # TimeDateStamp + PointerToSymbolTable + NumberOfSymbols
-        b"\xe0\x00"   # SizeOfOptionalHeader
-        b"\x02\x01"   # Characteristics
+        + b"\x00" * 12  # TimeDateStamp + PointerToSymbolTable + NumberOfSymbols
+        + b"\xe0\x00"   # SizeOfOptionalHeader
+        + b"\x02\x01"   # Characteristics
     )
     return mz + pe_sig + coff + b"\x00" * 512
 

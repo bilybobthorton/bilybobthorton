@@ -1,6 +1,4 @@
 """Unit tests for string extraction."""
-from pathlib import Path
-import pytest
 from engine.static.strings_extractor import extract_strings
 
 
