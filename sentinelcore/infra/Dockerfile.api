@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app/sentinelcore
 
-COPY sentinelcore/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY sentinelcore/ .
+COPY . .
 
 ENV PYTHONPATH=/app/sentinelcore
 
