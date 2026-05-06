@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfuzzy-dev \
     libssl-dev \
     build-essential \
+    curl \
     yara \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
