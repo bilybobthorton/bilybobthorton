@@ -21,7 +21,7 @@ git reset --hard "origin/$BRANCH"
 
 # ── Build images ──────────────────────────────────────────────────────────────
 echo "==> Building Docker images..."
-$COMPOSE build api worker dashboard
+$COMPOSE build api worker dashboard migrate
 
 # ── Migrate ───────────────────────────────────────────────────────────────────
 echo "==> Running database migrations..."
