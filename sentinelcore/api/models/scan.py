@@ -34,6 +34,7 @@ class User(Base):
     scans_today = Column(Integer, default=0)
     scans_reset_at = Column(DateTime(timezone=True))
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    shopify_customer_id = Column(String(64), nullable=True, index=True)
     is_verified = Column(Boolean, default=False)
     verification_token = Column(String(64), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

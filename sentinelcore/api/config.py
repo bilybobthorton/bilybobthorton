@@ -28,11 +28,12 @@ class Settings(BaseSettings):
     misp_key: str = ""
     misp_verify_ssl: bool = True
 
-    # Stripe billing
-    stripe_secret_key: str = ""
-    stripe_webhook_secret: str = ""
-    stripe_price_pro: str = ""
-    stripe_price_enterprise: str = ""
+    # Shopify billing
+    shopify_webhook_secret: str = ""   # Settings → Notifications → Webhooks → signing secret
+    shopify_store_url: str = ""        # e.g. https://redgaurd.myshopify.com
+    shopify_pro_url: str = ""          # direct product page URL (optional override)
+    shopify_enterprise_url: str = ""   # direct product page URL (optional override)
+    shopify_bundle_url: str = ""       # direct product page URL (optional override)
 
     # RedGuard VPN — WireGuard server config
     vpn_server_public_key: str = ""   # wg pubkey < /etc/wireguard/server_private.key

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const PLANS = [
   {
@@ -14,8 +14,8 @@ const PLANS = [
       "Hash reputation lookup",
       "Community YARA rules",
     ],
+    urlKey: null,
     cta: "Current plan",
-    disabled: true,
     highlight: false,
   },
   {
@@ -31,8 +31,8 @@ const PLANS = [
       "Endpoint agent access",
       "Priority support",
     ],
+    urlKey: "pro_url" as const,
     cta: "Upgrade to Pro",
-    disabled: false,
     highlight: true,
   },
   {
@@ -48,60 +48,43 @@ const PLANS = [
       "SIEM integration",
       "SLA + dedicated support",
     ],
+    urlKey: "enterprise_url" as const,
     cta: "Upgrade to Enterprise",
-    disabled: false,
     highlight: false,
   },
 ];
 
+interface ShopifyConfig {
+  store_url: string | null;
+  pro_url: string | null;
+  enterprise_url: string | null;
+  bundle_url: string | null;
+  manage_url: string | null;
+}
+
 export default function BillingPage() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<ShopifyConfig | null>(null);
 
-  const handleUpgrade = async (plan: string) => {
-    setLoading(plan);
-    setError(null);
-    try {
-      const res = await fetch("/api/v1/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          plan,
-          success_url: `${window.location.origin}/billing?success=true`,
-          cancel_url: `${window.location.origin}/billing`,
-        }),
-      });
+  useEffect(() => {
+    fetch("/api/v1/shopify/config")
+      .then((r) => r.json())
+      .then(setConfig)
+      .catch(() => null);
+  }, []);
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail ?? "Checkout failed");
-      }
-
-      const { checkout_url } = await res.json();
-      window.location.href = checkout_url;
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(null);
+  const handleUpgrade = (plan: typeof PLANS[number]) => {
+    if (!plan.urlKey) return;
+    const url = config?.[plan.urlKey];
+    if (url) {
+      window.open(url, "_blank", "noopener noreferrer");
+    } else if (config?.store_url) {
+      window.open(config.store_url, "_blank", "noopener noreferrer");
     }
   };
 
-  const handleManage = async () => {
-    setLoading("portal");
-    try {
-      const res = await fetch("/api/v1/billing/portal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ return_url: window.location.href }),
-      });
-      if (!res.ok) throw new Error("Could not open billing portal");
-      const { portal_url } = await res.json();
-      window.location.href = portal_url;
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(null);
-    }
+  const handleManage = () => {
+    const url = config?.manage_url ?? config?.store_url;
+    if (url) window.open(url, "_blank", "noopener noreferrer");
   };
 
   return (
@@ -110,14 +93,9 @@ export default function BillingPage() {
         <h1 className="text-2xl font-bold text-white">Plans &amp; Billing</h1>
         <p className="text-slate-500 text-sm mt-1">
           Upgrade your plan to unlock more scans, custom rules, and the endpoint agent.
+          Purchases are handled securely through our Shopify store.
         </p>
       </div>
-
-      {error && (
-        <div className="rounded-lg bg-red-900/20 border border-red-800 px-4 py-3 text-red-400 text-sm">
-          {error}
-        </div>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {PLANS.map((plan) => (
@@ -151,21 +129,20 @@ export default function BillingPage() {
               ))}
             </ul>
 
-            {plan.disabled ? (
+            {!plan.urlKey ? (
               <div className="text-center text-sm text-slate-500 border border-slate-800 rounded-lg py-2">
                 {plan.cta}
               </div>
             ) : (
               <button
-                onClick={() => handleUpgrade(plan.id)}
-                disabled={loading === plan.id}
+                onClick={() => handleUpgrade(plan)}
                 className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all ${
                   plan.highlight
-                    ? "bg-red-600 hover:bg-red-500 text-white disabled:opacity-50"
-                    : "bg-slate-700 hover:bg-slate-600 text-white disabled:opacity-50"
+                    ? "bg-red-600 hover:bg-red-500 text-white"
+                    : "bg-slate-700 hover:bg-slate-600 text-white"
                 }`}
               >
-                {loading === plan.id ? "Redirecting..." : plan.cta}
+                {plan.cta}
               </button>
             )}
           </div>
@@ -177,15 +154,14 @@ export default function BillingPage() {
           <div>
             <p className="text-sm text-slate-300 font-medium">Manage subscription</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Update payment method, view invoices, or cancel your plan.
+              Update payment method, view invoices, or cancel — handled through your Shopify account.
             </p>
           </div>
           <button
             onClick={handleManage}
-            disabled={loading === "portal"}
-            className="text-sm px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition-colors disabled:opacity-50"
+            className="text-sm px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white transition-colors"
           >
-            {loading === "portal" ? "Opening..." : "Billing portal →"}
+            Manage on Shopify →
           </button>
         </div>
       </div>

@@ -209,10 +209,11 @@ OTX_API_KEY=            # otx.alienvault.com free tier
 RESEND_API_KEY=re_...   # resend.com free tier (3k emails/mo)
 EMAIL_FROM=SentinelCore <alerts@yourdomain.com>
 APP_BASE_URL=https://yourdomain.com
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_PRO=price_...
-STRIPE_PRICE_ENTERPRISE=price_...
+SHOPIFY_WEBHOOK_SECRET=          # Settings → Notifications → Webhooks → signing secret
+SHOPIFY_STORE_URL=https://redgaurd.myshopify.com
+SHOPIFY_PRO_URL=                 # optional: direct product URL override
+SHOPIFY_ENTERPRISE_URL=
+SHOPIFY_BUNDLE_URL=
 MISP_URL=https://your-misp.example.com   # Enterprise only
 MISP_KEY=...
 MISP_VERIFY_SSL=true
@@ -373,3 +374,14 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Built `/history` page: scan table with threat badges, status pills, date, SHA256 snippet, links to reports
 - Settings page: trial banner with days-remaining + upgrade CTA, plan display, history link
 - Added History to nav
+
+### Session 9 — 2026-05-05
+- Replaced Stripe billing with Shopify
+- `routes/shopify.py` — HMAC-verified webhook (orders/paid, subscription activate/cancel, GDPR topics); `/subscription` + `/config` endpoints
+- `routes/billing.py` — now a stub that re-exports shopify router for import compat
+- `models/scan.py` — added `shopify_customer_id` column
+- `config.py` — Stripe vars → `shopify_webhook_secret`, `shopify_store_url`, `shopify_pro_url`, `shopify_enterprise_url`, `shopify_bundle_url`
+- `alembic/versions/0008_shopify.py` — adds shopify_customer_id, drops Stripe columns
+- `dashboard/app/billing/page.tsx` — upgrade buttons open Shopify product URLs (fetched from `/api/v1/shopify/config`); manage links to Shopify account page
+- Tier detection: product title keyword match (enterprise → enterprise; bundle/vpn/pro → pro)
+- Shopify ↔ app account link: email match on `orders/paid` webhook
