@@ -1,4 +1,4 @@
-/// SentinelCore Agent — lightweight endpoint security daemon.
+/// RedGuard Agent — lightweight endpoint security daemon.
 /// Monitors file system, processes, and file integrity in real time.
 mod alert;
 mod config;
@@ -19,7 +19,7 @@ use tracing_subscriber::EnvFilter;
 #[command(
     name = "sentinel-agent",
     version = "0.1.0",
-    about = "SentinelCore endpoint security agent",
+    about = "RedGuard endpoint security agent",
     long_about = "Real-time malware detection: filesystem monitoring, process analysis, LOLBAS detection, and file integrity verification."
 )]
 struct Cli {
@@ -119,7 +119,7 @@ async fn run_agent(
 
     let agent_id = uuid::Uuid::new_v4().to_string();
 
-    info!("SentinelCore Agent v0.1.0 starting");
+    info!("RedGuard Agent v0.1.0 starting");
     info!("Hostname: {}", hostname);
     info!("Agent ID: {}", agent_id);
     info!("Auto-quarantine: {}", config.auto_quarantine);
@@ -266,7 +266,7 @@ fn handle_quarantine(action: QuarantineCommands, config: &config::AgentConfig) -
 }
 
 fn print_status(config: &config::AgentConfig) {
-    println!("SentinelCore Agent v0.1.0");
+    println!("RedGuard Agent v0.1.0");
     println!();
     println!("Watch directories:");
     for dir in &config.watch_dirs {

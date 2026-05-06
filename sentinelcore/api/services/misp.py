@@ -1,7 +1,7 @@
 """
 MISP (Malware Information Sharing Platform) integration — Enterprise tier.
 
-Converts SentinelCore scan reports to MISP event format and optionally
+Converts RedGuard scan reports to MISP event format and optionally
 pushes to a MISP instance via the REST API.
 
 No extra dependencies — uses httpx (already in requirements).
@@ -29,7 +29,7 @@ _ANALYSIS_COMPLETED = "2"
 _DISTRIBUTION_ORG_ONLY = "0"  # default; enterprise users can override
 
 
-def build_misp_event(report: dict, org_name: str = "SentinelCore") -> dict:
+def build_misp_event(report: dict, org_name: str = "RedGuard") -> dict:
     """
     Convert a scan report dict (from _build_report_dict) into a MISP event
     structure ready to POST to /events/add.
@@ -87,7 +87,7 @@ def build_misp_event(report: dict, org_name: str = "SentinelCore") -> dict:
         label = "MALICIOUS" if ml.get("malicious") else "CLEAN"
         attributes.append(_attr(
             "text", "External analysis",
-            f"SentinelCore ML: {ml.get('score', 0)*100:.1f}% malice probability ({label})",
+            f"RedGuard ML: {ml.get('score', 0)*100:.1f}% malice probability ({label})",
             to_ids=False,
         ))
 
@@ -123,7 +123,7 @@ def build_misp_event(report: dict, org_name: str = "SentinelCore") -> dict:
     event = {
         "Event": {
             "uuid": str(uuid.uuid4()),
-            "info": f"SentinelCore: {file_info['name']} — {tl.upper()}",
+            "info": f"RedGuard: {file_info['name']} — {tl.upper()}",
             "threat_level_id": _THREAT_LEVEL.get(tl, "4"),
             "analysis": _ANALYSIS_COMPLETED,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),

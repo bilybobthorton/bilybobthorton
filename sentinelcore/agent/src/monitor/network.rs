@@ -20,7 +20,7 @@ use crate::config::AgentConfig;
 
 // ── Threat intel seeds ────────────────────────────────────────────────────────
 // Sourced from public threat reports (Cobalt Strike defaults, common C2 ports,
-// known malware infrastructure ranges). Augmented by the SentinelCore API at
+// known malware infrastructure ranges). Augmented by the RedGuard API at
 // runtime when an API key is configured.
 
 /// Ports frequently used for reverse shells and C2 beacons.

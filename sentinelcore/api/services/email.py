@@ -46,7 +46,7 @@ def _build_html(
               <td style="width:28px;height:28px;background:#dc2626;border-radius:6px;text-align:center;vertical-align:middle;">
                 <span style="color:#fff;font-weight:700;font-size:11px;">SC</span>
               </td>
-              <td style="padding-left:10px;color:#fff;font-weight:600;font-size:15px;">SentinelCore</td>
+              <td style="padding-left:10px;color:#fff;font-weight:600;font-size:15px;">RedGuard</td>
             </tr>
           </table>
         </td></tr>
@@ -116,7 +116,7 @@ def _build_text(
     scan_url: str,
 ) -> str:
     lines = [
-        "SentinelCore — Scan Alert",
+        "RedGuard — Scan Alert",
         "=" * 40,
         f"Result    : {threat_level.upper()}",
         f"File      : {filename}",
@@ -129,7 +129,7 @@ def _build_text(
         for ind in indicators[:10]:
             lines.append(f"  • {ind}")
         lines.append("")
-    lines += [f"Full report: {scan_url}", "", "— SentinelCore"]
+    lines += [f"Full report: {scan_url}", "", "— RedGuard"]
     return "\n".join(lines)
 
 
@@ -158,13 +158,13 @@ async def send_verification_email(
             <td style="width:28px;height:28px;background:#dc2626;border-radius:6px;text-align:center;vertical-align:middle;">
               <span style="color:#fff;font-weight:700;font-size:11px;">SC</span>
             </td>
-            <td style="padding-left:10px;color:#fff;font-weight:600;font-size:15px;">SentinelCore</td>
+            <td style="padding-left:10px;color:#fff;font-weight:600;font-size:15px;">RedGuard</td>
           </tr></table>
         </td></tr>
         <tr><td style="padding:32px;">
           <p style="margin:0 0 8px;font-size:22px;font-weight:700;color:#fff;">Verify your email</p>
           <p style="margin:0 0 24px;font-size:14px;color:#94a3b8;line-height:1.6;">
-            Click the button below to verify your email address and activate your SentinelCore account.
+            Click the button below to verify your email address and activate your RedGuard account.
             This link expires in 24 hours.
           </p>
           <a href="{verify_url}"
@@ -177,7 +177,7 @@ async def send_verification_email(
           </p>
         </td></tr>
         <tr><td style="padding:20px 32px;border-top:1px solid #1e293b;">
-          <p style="margin:0;font-size:12px;color:#475569;">If you didn't create a SentinelCore account, you can safely ignore this email.</p>
+          <p style="margin:0;font-size:12px;color:#475569;">If you didn't create a RedGuard account, you can safely ignore this email.</p>
         </td></tr>
       </table>
     </td></tr>
@@ -188,9 +188,9 @@ async def send_verification_email(
     payload = {
         "from": from_email,
         "to": [to_email],
-        "subject": "Verify your SentinelCore email",
+        "subject": "Verify your RedGuard email",
         "html": html,
-        "text": f"SentinelCore — Verify your email\n\nClick here: {verify_url}\n\nIf you didn't sign up, ignore this email.",
+        "text": f"RedGuard — Verify your email\n\nClick here: {verify_url}\n\nIf you didn't sign up, ignore this email.",
     }
 
     try:

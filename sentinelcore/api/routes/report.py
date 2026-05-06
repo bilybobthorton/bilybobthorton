@@ -78,7 +78,7 @@ async def report_pdf(
         raise HTTPException(status_code=500, detail=f"PDF generation failed: {exc}")
 
     safe_name = job.filename.replace(" ", "_").replace("/", "_")[:60]
-    filename = f"SentinelCore-Report-{safe_name}.pdf"
+    filename = f"RedGuard-Report-{safe_name}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -212,7 +212,7 @@ def _render_html(r: dict) -> str:
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SentinelCore Report — {f["name"]}</title>
+<title>RedGuard Report — {f["name"]}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap');
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -256,7 +256,7 @@ def _render_html(r: dict) -> str:
   <header>
     <div class="logo">
       <div class="logo-box">SC</div>
-      <div class="logo-name">SentinelCore</div>
+      <div class="logo-name">RedGuard</div>
     </div>
     <div class="meta">
       <div>Scan Report v{r["report_version"]}</div>
@@ -334,7 +334,7 @@ def _render_html(r: dict) -> str:
   '''}
 
   <footer>
-    <span>SentinelCore — Malware Detection Platform</span>
+    <span>RedGuard — Malware Detection Platform</span>
     <span>Scan completed: {r.get("scan_completed_at","")[:19].replace("T"," ") if r.get("scan_completed_at") else "—"} UTC</span>
   </footer>
 </div>
@@ -415,7 +415,7 @@ def _render_pdf_html(r: dict) -> str:
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SentinelCore Report — {f["name"]}</title>
+<title>RedGuard Report — {f["name"]}</title>
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{ font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 11px; line-height: 1.5; background: white; }}
@@ -445,7 +445,7 @@ def _render_pdf_html(r: dict) -> str:
 <body>
 <div class="page">
   <header>
-    <div class="logo">SentinelCore <span>Malware Analysis Report</span></div>
+    <div class="logo">RedGuard <span>Malware Analysis Report</span></div>
     <div class="meta">
       <div>Report v{r["report_version"]} · Generated {r["generated_at"][:10]}</div>
       <div>Analyst: {r["analyst"]}</div>
@@ -498,7 +498,7 @@ def _render_pdf_html(r: dict) -> str:
   {pe_section}
 
   <footer>
-    <span>SentinelCore — Confidential Analysis Report</span>
+    <span>RedGuard — Confidential Analysis Report</span>
     <span>Generated {r["generated_at"][:19].replace("T"," ")} UTC</span>
   </footer>
 </div>

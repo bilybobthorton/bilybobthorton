@@ -51,14 +51,14 @@ export default function RegisterPage() {
             <div className="h-10 w-10 rounded-lg bg-red-600 flex items-center justify-center">
               <ShieldCheck className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">SentinelCore</span>
+            <span className="text-xl font-bold text-white tracking-tight">RedGuard</span>
           </div>
 
           <h2 className="text-3xl font-bold text-white leading-tight mb-3">
             Enterprise-grade security,<br />free to start.
           </h2>
           <p className="text-slate-400 text-sm mb-8 leading-relaxed">
-            Built by a USMC cybersecurity operator. Four detection layers working in parallel to catch threats that single-engine scanners miss.
+            Built by the people, for the people. Four detection layers working in parallel to catch threats that single-engine scanners miss.
           </p>
 
           <ul className="space-y-3">
@@ -86,7 +86,7 @@ export default function RegisterPage() {
             <div className="h-10 w-10 rounded-lg bg-red-600 flex items-center justify-center">
               <ShieldCheck className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">SentinelCore</span>
+            <span className="text-xl font-bold text-white tracking-tight">RedGuard</span>
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-[#0d0d14] p-8 shadow-2xl">

@@ -16,7 +16,7 @@ const FEATURES = [
   {
     icon: Zap,
     title: "Threat-Aware Routing",
-    body: "Pairs with SentinelCore: known-malicious domains and C2 IPs are blocked at the VPN gateway before they reach your device.",
+    body: "Pairs with RedGuard: known-malicious domains and C2 IPs are blocked at the VPN gateway before they reach your device.",
   },
   {
     icon: Globe,
@@ -71,11 +71,11 @@ const PLANS = [
     name: "Security Bundle",
     price: "$12.99",
     period: "/mo",
-    description: "VPN Pro + SentinelCore Pro · Best value",
+    description: "VPN Pro + RedGuard Pro · Best value",
     badge: "Best value",
     features: [
       "Everything in VPN Pro",
-      "SentinelCore Pro (unlimited scans)",
+      "RedGuard Pro (unlimited scans)",
       "Threat-aware VPN routing",
       "ML malware scoring",
       "Custom YARA rules",
@@ -124,7 +124,7 @@ export default function VPNPage() {
             RedGuard VPN
           </h1>
           <p className="text-lg text-slate-400 leading-relaxed mb-3">
-            Privacy protection built by a cybersecurity operator — not a marketing team.
+            Privacy protection built by the people, for the people — not a marketing team.
           </p>
           <p className="text-base text-slate-500 mb-10 max-w-xl mx-auto">
             WireGuard-powered. Zero logs. Threat-aware routing that blocks C2 domains and malicious IPs
@@ -218,7 +218,7 @@ export default function VPNPage() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-white mb-3">Simple pricing</h2>
-            <p className="text-slate-400">Bundle RedGuard VPN + SentinelCore and save 30% vs buying separately.</p>
+            <p className="text-slate-400">Bundle RedGuard VPN + RedGuard and save 30% vs buying separately.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {PLANS.map((plan) => (
@@ -275,7 +275,7 @@ export default function VPNPage() {
             Full-stack protection starts free.
           </h2>
           <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-            SentinelCore catches what&apos;s already on your device. RedGuard VPN secures what&apos;s going in and out.
+            RedGuard catches what&apos;s already on your device. RedGuard VPN secures what&apos;s going in and out.
             Together, they&apos;re a complete threat response platform.
           </p>
           <a

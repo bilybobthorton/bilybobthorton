@@ -32,7 +32,7 @@ export default function LoginPage() {
           <div className="h-10 w-10 rounded-lg bg-red-600 flex items-center justify-center">
             <ShieldCheck className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xl font-bold text-white tracking-tight">SentinelCore</span>
+          <span className="text-xl font-bold text-white tracking-tight">RedGuard</span>
         </div>
 
         <div className="rounded-xl border border-slate-800 bg-[#0d0d14] p-8 shadow-2xl">

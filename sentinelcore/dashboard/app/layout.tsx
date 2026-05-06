@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthNav } from "@/components/AuthNav";
 
 export const metadata: Metadata = {
-  title: "SentinelCore — Enterprise Malware Detection",
+  title: "RedGuard — Enterprise Malware Detection",
   description:
     "Four-layer malware detection: static analysis, ML scoring, VirusTotal, and OTX threat intel. Built for consumers, SMBs, and enterprise.",
 };
@@ -16,9 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl flex items-center gap-6">
             <a href="/" className="flex items-center gap-3 mr-2">
               <div className="h-7 w-7 rounded bg-red-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">SC</span>
+                <span className="text-white font-bold text-xs">RG</span>
               </div>
-              <span className="font-semibold text-white tracking-tight">SentinelCore</span>
+              <span className="font-semibold text-white tracking-tight">RedGuard</span>
             </a>
             <a href="/dashboard" className="text-sm text-slate-400 hover:text-white transition-colors">Dashboard</a>
             <a href="/scan"     className="text-sm text-slate-400 hover:text-white transition-colors">Scan</a>
@@ -37,11 +37,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
             <div className="flex items-center gap-2">
               <div className="h-5 w-5 rounded bg-red-600 flex items-center justify-center">
-                <span className="text-white font-bold text-[9px]">SC</span>
+                <span className="text-white font-bold text-[9px]">RG</span>
               </div>
-              <span>SentinelCore</span>
+              <span>RedGuard</span>
             </div>
-            <p>© {new Date().getFullYear()} SentinelCore. Built by a cybersecurity operator, for everyone.</p>
+            <p>© {new Date().getFullYear()} RedGuard. Built by the people, for the people.</p>
             <div className="flex gap-4">
               <a href="/scan"     className="hover:text-slate-300 transition-colors">Scan</a>
               <a href="/#pricing" className="hover:text-slate-300 transition-colors">Pricing</a>

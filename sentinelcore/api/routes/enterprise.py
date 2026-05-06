@@ -59,7 +59,7 @@ async def misp_export(
     """
     job = await _get_job(scan_id, db)
     report = _build_report_dict(job, current_user)
-    event = build_misp_event(report, org_name="SentinelCore")
+    event = build_misp_event(report, org_name="RedGuard")
 
     pushed = False
     event_uuid: str | None = None
@@ -119,7 +119,7 @@ async def misp_push(
 
     job = await _get_job(scan_id, db)
     report = _build_report_dict(job, current_user)
-    event = build_misp_event(report, org_name="SentinelCore")
+    event = build_misp_event(report, org_name="RedGuard")
 
     try:
         response = await push_to_misp(

@@ -163,7 +163,7 @@ async def _fire(endpoint: WebhookEndpoint, payload: dict) -> tuple[bool, int]:
                     "Content-Type": "application/json",
                     "X-Sentinel-Signature": sig,
                     "X-Sentinel-Event": payload.get("event", ""),
-                    "User-Agent": "SentinelCore-Webhook/1.0",
+                    "User-Agent": "RedGuard-Webhook/1.0",
                 },
             )
             return resp.status_code < 400, resp.status_code

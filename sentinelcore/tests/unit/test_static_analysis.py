@@ -14,7 +14,7 @@ def _write_temp(content: bytes) -> Path:
 
 
 def test_hashes_are_consistent():
-    data = b"SentinelCore test payload"
+    data = b"RedGuard test payload"
     path = _write_temp(data)
     result = compute_hashes(path)
     result2 = compute_hashes(path)

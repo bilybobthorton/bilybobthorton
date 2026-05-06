@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
-    /// SentinelCore API base URL
+    /// RedGuard API base URL
     pub api_url: String,
     /// API key for authentication
     pub api_key: Option<String>,
@@ -33,7 +33,7 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
-            api_url: "http://localhost:8000".to_string(),
+            api_url: "https://api.redgaurd.com".to_string(),
             api_key: None,
             watch_dirs: default_watch_dirs(),
             exclude_dirs: default_exclude_dirs(),

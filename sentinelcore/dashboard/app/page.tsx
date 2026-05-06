@@ -170,7 +170,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="mx-auto max-w-2xl text-lg text-slate-400 leading-relaxed">
-            SentinelCore combines static analysis, machine learning, VirusTotal,
+            RedGuard combines static analysis, machine learning, VirusTotal,
             and AlienVault OTX into a single 4-layer pipeline. Scan any file in
             seconds — no installation required.
           </p>
@@ -377,7 +377,7 @@ export default function LandingPage() {
               Add VPN protection for complete coverage.
             </h3>
             <p className="text-slate-400 text-sm leading-relaxed max-w-lg">
-              SentinelCore stops malware on your device. RedGuard VPN encrypts your traffic,
+              RedGuard stops malware on your device. RedGuard VPN encrypts your traffic,
               blocks C2 domains at the gateway, and shields your identity. Bundle both for $12.99/mo.
             </p>
           </div>

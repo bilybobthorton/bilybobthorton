@@ -108,7 +108,7 @@ export default function ApiDocsPage() {
       <div className="space-y-3">
         <h1 className="text-3xl font-bold text-white">API Reference</h1>
         <p className="text-slate-400 max-w-2xl">
-          REST API for SentinelCore malware scanning, threat intel, YARA rules, endpoint agent
+          REST API for RedGuard malware scanning, threat intel, YARA rules, endpoint agent
           ingestion, webhooks, and RedGuard VPN key management.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">

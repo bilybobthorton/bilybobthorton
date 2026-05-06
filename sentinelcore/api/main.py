@@ -9,7 +9,7 @@ from api.routes import webhooks, vpn, stats
 settings = get_settings()
 
 app = FastAPI(
-    title="SentinelCore API",
+    title="RedGuard API",
     description="Malware detection and analysis platform",
     version="0.1.0",
     docs_url="/docs" if settings.app_env != "production" else None,

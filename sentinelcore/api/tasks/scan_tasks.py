@@ -84,7 +84,7 @@ def _fire_webhooks(user_id: str, event: str, payload: dict) -> None:
                         "Content-Type": "application/json",
                         "X-Sentinel-Signature": sig,
                         "X-Sentinel-Event": event,
-                        "User-Agent": "SentinelCore-Webhook/1.0",
+                        "User-Agent": "RedGuard-Webhook/1.0",
                     },
                     timeout=8,
                 )

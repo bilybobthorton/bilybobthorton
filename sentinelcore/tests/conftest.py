@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for SentinelCore test suite.
+Shared pytest fixtures for RedGuard test suite.
 """
 import asyncio
 import os

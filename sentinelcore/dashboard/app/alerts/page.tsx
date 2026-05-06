@@ -210,7 +210,7 @@ export default function AlertsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Endpoint Alerts</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Real-time detections from the SentinelCore agent
+            Real-time detections from the RedGuard agent
           </p>
         </div>
         <div className="flex items-center gap-3">

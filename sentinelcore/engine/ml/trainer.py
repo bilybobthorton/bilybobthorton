@@ -1,5 +1,5 @@
 """
-Offline trainer for the SentinelCore RandomForest classifier.
+Offline trainer for the RedGuard RandomForest classifier.
 
 Run this script against a labeled dataset of malware/benign PE files:
 
@@ -219,7 +219,7 @@ def _generate_synthetic_model(output: Path) -> MalwareClassifier:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train SentinelCore ML model")
+    parser = argparse.ArgumentParser(description="Train RedGuard ML model")
     parser.add_argument("--malware", type=Path, help="Directory of malware samples")
     parser.add_argument("--benign", type=Path, help="Directory of benign samples")
     parser.add_argument("--output", type=Path, default=_MODEL_PATH)

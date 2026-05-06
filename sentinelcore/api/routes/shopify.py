@@ -29,7 +29,7 @@ settings = get_settings()
 # Product title keywords → tier (checked in order; first match wins)
 _TIER_KEYWORDS: list[tuple[str, str]] = [
     ("enterprise", "enterprise"),
-    ("bundle", "pro"),      # Security Bundle = SentinelCore Pro + VPN
+    ("bundle", "pro"),      # Security Bundle = RedGuard Pro + VPN
     ("pro", "pro"),
     ("vpn", "pro"),         # standalone VPN Pro treated as pro
 ]

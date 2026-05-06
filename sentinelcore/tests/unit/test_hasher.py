@@ -4,7 +4,7 @@ from engine.static.hasher import compute_hashes
 
 def test_compute_hashes_returns_all_fields(tmp_path):
     f = tmp_path / "sample.bin"
-    f.write_bytes(b"Hello, SentinelCore!")
+    f.write_bytes(b"Hello, RedGuard!")
     h = compute_hashes(f)
     assert len(h.md5) == 32
     assert len(h.sha256) == 64

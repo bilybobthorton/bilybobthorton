@@ -1,4 +1,4 @@
-/// HTTP reporter — ships alerts to the SentinelCore API backend.
+/// HTTP reporter — ships alerts to the RedGuard API backend.
 /// Batches alerts and retries on transient failures.
 use crate::alert::Alert;
 use anyhow::Result;
@@ -32,7 +32,7 @@ impl Reporter {
     ) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(10))
-            .user_agent("SentinelCore-Agent/0.1")
+            .user_agent("RedGuard-Agent/0.1")
             .build()?;
 
         Ok(Self {
