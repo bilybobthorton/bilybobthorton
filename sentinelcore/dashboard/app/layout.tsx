@@ -29,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a href="/vpn/keys"      className="text-sm text-slate-400 hover:text-white transition-colors">Devices</a>
             <a href="/vpn/locations" className="text-sm text-slate-400 hover:text-white transition-colors">Locations</a>
             <a href="/#pricing"      className="text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
+            <a href="/download"     className="text-sm font-semibold text-red-400 hover:text-red-300 transition-colors">Download</a>
             <AuthNav />
           </div>
         </nav>

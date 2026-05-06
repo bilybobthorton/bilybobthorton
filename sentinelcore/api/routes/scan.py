@@ -105,44 +105,6 @@ async def scan_file(
     )
 
 
-@router.get("/{scan_id}", response_model=ScanResult)
-async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(ScanJob).where(ScanJob.id == uuid.UUID(scan_id)))
-    job = result.scalar_one_or_none()
-    if not job:
-        raise HTTPException(status_code=404, detail="Scan not found")
-
-    indicators = []
-    sha256 = None
-    ml_data = None
-    vt_data = None
-    otx_data = None
-
-    if job.result_json:
-        indicators = job.result_json.get("indicators", [])
-        hashes = job.result_json.get("hashes", {})
-        sha256 = hashes.get("sha256")
-        ml_data = job.result_json.get("ml")
-        vt_data = job.result_json.get("virustotal")
-        otx_data = job.result_json.get("otx")
-        heuristics_data = job.result_json.get("heuristics")
-
-    return ScanResult(
-        scan_id=str(job.id),
-        filename=job.filename,
-        sha256=sha256,
-        status=job.status,
-        threat_level=job.threat_level,
-        confidence=job.confidence,
-        indicators=indicators,
-        ml=ml_data,
-        virustotal=vt_data,
-        otx=otx_data,
-        heuristics=heuristics_data,
-        error=job.error,
-    )
-
-
 @router.get("/history", response_model=list[ScanHistoryItem])
 async def scan_history(
     limit: int = Query(default=50, le=200),
@@ -172,6 +134,45 @@ async def scan_history(
         )
         for j in jobs
     ]
+
+
+@router.get("/{scan_id}", response_model=ScanResult)
+async def get_scan(scan_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ScanJob).where(ScanJob.id == uuid.UUID(scan_id)))
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Scan not found")
+
+    indicators = []
+    sha256 = None
+    ml_data = None
+    vt_data = None
+    otx_data = None
+    heuristics_data = None
+
+    if job.result_json:
+        indicators = job.result_json.get("indicators", [])
+        hashes = job.result_json.get("hashes", {})
+        sha256 = hashes.get("sha256")
+        ml_data = job.result_json.get("ml")
+        vt_data = job.result_json.get("virustotal")
+        otx_data = job.result_json.get("otx")
+        heuristics_data = job.result_json.get("heuristics")
+
+    return ScanResult(
+        scan_id=str(job.id),
+        filename=job.filename,
+        sha256=sha256,
+        status=job.status,
+        threat_level=job.threat_level,
+        confidence=job.confidence,
+        indicators=indicators,
+        ml=ml_data,
+        virustotal=vt_data,
+        otx=otx_data,
+        heuristics=heuristics_data,
+        error=job.error,
+    )
 
 
 @router.post("/hash")

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { authHeaders } from "@/lib/auth";
 
 interface AgentAlert {
   id: string;
@@ -177,7 +178,7 @@ export default function AlertsPage() {
       if (filterSeverity) params.set("severity", filterSeverity);
       if (filterKind) params.set("kind", filterKind);
 
-      const res = await fetch(`/api/v1/agent/alerts?${params}`);
+      const res = await fetch(`/api/v1/agent/alerts?${params}`, { headers: authHeaders() });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const data = await res.json();
       setAlerts(data);
