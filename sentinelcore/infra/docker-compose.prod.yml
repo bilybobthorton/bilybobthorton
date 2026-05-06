@@ -14,6 +14,7 @@ services:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - certbot_certs:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
+      - downloads:/var/www/downloads:ro
     depends_on:
       - api
       - dashboard
@@ -137,3 +138,9 @@ volumes:
   ml_models:
   certbot_certs:
   certbot_www:
+  downloads:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/redguard/downloads

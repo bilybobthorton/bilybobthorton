@@ -1,7 +1,7 @@
 "use client";
 import { Download, Shield, Monitor, Zap, Lock } from "lucide-react";
 
-const RELEASE_URL = "https://github.com/bilybobthorton/bilybobthorton/releases/latest";
+const DOWNLOAD_URL = "http://dashboard.redgaurd.com/files/RedGuard_Setup.exe";
 
 const FEATURES = [
   { icon: Shield, text: "Real-time malware protection" },
@@ -35,7 +35,7 @@ export default function DownloadPage() {
 
         {/* Download button */}
         <a
-          href={`${RELEASE_URL}/download/RedGuard_Setup.exe`}
+          href={DOWNLOAD_URL}
           className="inline-flex items-center gap-3 bg-red-600 hover:bg-red-500 transition-colors text-white font-bold text-lg px-10 py-4 rounded-xl shadow-lg shadow-red-900/30"
         >
           <Download className="h-5 w-5" />
@@ -78,8 +78,6 @@ export default function DownloadPage() {
 
         {/* Other links */}
         <div className="mt-8 flex items-center justify-center gap-6 text-sm text-slate-500">
-          <a href={RELEASE_URL} className="hover:text-slate-300 transition-colors">All releases</a>
-          <span>·</span>
           <a href="/register" className="hover:text-slate-300 transition-colors">Create account</a>
           <span>·</span>
           <a href="https://dashboard.redgaurd.com" className="hover:text-slate-300 transition-colors">Dashboard</a>
