@@ -9,6 +9,13 @@ use tauri::{
 pub fn run() {
     tauri::Builder::default()
         // Plugins
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // Second launch: show the existing window instead of opening another.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::default().build())

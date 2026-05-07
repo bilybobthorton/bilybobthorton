@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Globe, Wifi, WifiOff, Server, ExternalLink } from "lucide-react";
+import { Wifi, WifiOff, Server } from "lucide-react";
 
 interface VpnStatus {
   connected: boolean;
@@ -48,16 +48,11 @@ export default function VPN() {
   }, []);
 
   const handleConnect = async () => {
-    if (devices.length === 0) {
-      setError(
-        "No VPN devices configured. Add a device at dashboard.redgaurd.com/vpn/keys"
-      );
-      return;
-    }
     setError(null);
     setLoading(true);
     try {
-      await invoke("connect_vpn", { deviceId: devices[0].id });
+      // Auto-provisions a device if the user has none — no config needed.
+      await invoke("connect_vpn");
       setStatus({ connected: true, server: "US East — New York" });
     } catch (e) {
       setError(String(e));
@@ -289,33 +284,18 @@ export default function VPN() {
         </>
       )}
 
-      {/* Manage devices hint */}
+      {/* Info note */}
       <div
         style={{
-          padding: "14px 16px",
+          padding: "12px 16px",
           background: "#0d0d14",
           border: "1px solid #1e1e2e",
           borderRadius: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          color: "#64748b",
-          fontSize: 13,
+          color: "#475569",
+          fontSize: 12,
         }}
       >
-        <Globe size={16} color="#475569" />
-        <span style={{ flex: 1 }}>
-          Add or manage VPN devices at{" "}
-          <a
-            href="https://dashboard.redgaurd.com/vpn/keys"
-            target="_blank"
-            rel="noreferrer"
-            style={{ color: "#dc2626" }}
-          >
-            dashboard.redgaurd.com
-          </a>
-        </span>
-        <ExternalLink size={14} color="#334155" />
+        RedGuard VPN automatically configures your device on first connect. WireGuard must be installed on your PC.
       </div>
     </div>
   );
