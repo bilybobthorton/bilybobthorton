@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   User,
-  CreditCard,
   Shield,
   Globe,
   Info,

@@ -27,7 +27,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const store = await load(STORE_FILE, { autoSave: false });
+        const store = await load(STORE_FILE, { autoSave: false, defaults: {} });
         const token = await store.get<string>("token");
         const email = await store.get<string>("email");
         const tier = await store.get<string>("tier");
@@ -45,7 +45,7 @@ export default function App() {
   const handleLogin = async (token: string, email: string, tier: string) => {
     setAuth({ token, email, tier });
     try {
-      const store = await load(STORE_FILE, { autoSave: false });
+      const store = await load(STORE_FILE, { autoSave: false, defaults: {} });
       await store.set("token", token);
       await store.set("email", email);
       await store.set("tier", tier);
@@ -68,7 +68,7 @@ export default function App() {
       // Best effort.
     }
     try {
-      const store = await load(STORE_FILE, { autoSave: false });
+      const store = await load(STORE_FILE, { autoSave: false, defaults: {} });
       await store.delete("token");
       await store.delete("email");
       await store.delete("tier");
