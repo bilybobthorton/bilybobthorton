@@ -1,0 +1,22 @@
+name: Deploy Shopify Theme
+
+on:
+  push:
+    branches: [claude/malware-detection-app-bRsUv, main]
+    paths:
+      - "sentinelcore/shopify/**"
+
+jobs:
+  deploy:
+    name: Push theme files to Shopify
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push theme assets
+        env:
+          SHOPIFY_ADMIN_TOKEN: ${{ secrets.SHOPIFY_ADMIN_TOKEN }}
+          SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+          SHOPIFY_STORE: redgaurd.myshopify.com
+        run: bash sentinelcore/scripts/shopify-push.sh
