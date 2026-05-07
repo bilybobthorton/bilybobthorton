@@ -397,6 +397,29 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Settings page: trial banner with days-remaining + upgrade CTA, plan display, history link
 - Added History to nav
 
+### Session 11 — 2026-05-07
+- **7-day VPN trial funnel:** Reduced trial from 14→7 days; API gates VPN endpoints with HTTP 402 `vpn_trial_expired`; app shows upgrade banner on trial expiry
+- **Seamless VPN:** `connect_vpn()` auto-provisions WireGuard device (no dashboard visit needed), downloads .conf, installs+activates tunnel silently
+- **Scanner upgraded to multi-layer engine:**
+  - Layer 1: Local SHA256 blocklist (instant)
+  - Layer 2: Local PE entropy + suspicious import string heuristics (score 0-10, no API)
+  - Layer 3: Heuristic-flagged PE files uploaded for full cloud analysis (ML + YARA + VT + OTX)
+  - Layer 4: Cloud hash lookup for everything else
+  - Quick Scan (Downloads/AppData/Temp) and Full Scan (+ System32/SysWOW64/Program Files)
+  - UI: mode selector, malicious vs suspicious counters, badge by source, detail + score on expand
+- **Single instance:** tauri-plugin-single-instance — double-launch shows existing window instead of opening another app + extra tray icon
+- **Icons:** Supersampled 4x→LANCZOS red rounded rect + bold white "RG"; tray = red circle with R
+- **Shopify storefront:** sentinelcore/shopify/homepage.liquid — full dark-themed self-contained landing page ({% layout none %})
+- **Shopify auto-deploy:** .github/workflows/shopify-deploy.yml + scripts/shopify-push.sh — pushes theme assets via Admin API on every push to shopify/ dir (needs SHOPIFY_ADMIN_TOKEN + SHOPIFY_THEME_ID GitHub secrets)
+- **dashboard.redgaurd.com fixed:** nginx serving HTTP (HTTPS cert for dashboard.redgaurd.com not yet issued); reloaded nginx after deploy picked up config change
+- **app-v0.1.2 tagged:** Windows .exe build triggered with all scanner improvements
+
+### Pending (start of next session)
+1. Issue TLS cert for dashboard.redgaurd.com (certbot command — see memory/project_state.md)
+2. Set up WireGuard server (VPN non-functional without it — run setup-wireguard.sh on server)
+3. Activate Shopify homepage (paste homepage.liquid into theme editor OR set SHOPIFY_ADMIN_TOKEN + SHOPIFY_THEME_ID secrets)
+4. Check GitHub Actions build-app.yml result for app-v0.1.2
+
 ### Session 10 — 2026-05-06
 - **Full rebrand:** SentinelCore → RedGuard across all 25+ files (UI, API, agent, emails, reports)
 - **Architecture pivot:** Product is now a downloadable desktop app (like Malwarebytes), not web-first
