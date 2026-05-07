@@ -7,8 +7,9 @@ import Home from "./screens/Home";
 import VPN from "./screens/VPN";
 import Threats from "./screens/Threats";
 import Settings from "./screens/Settings";
+import Scan from "./screens/Scan";
 
-export type Screen = "home" | "vpn" | "threats" | "settings";
+export type Screen = "home" | "vpn" | "threats" | "scan" | "settings";
 
 export interface AuthState {
   token: string;
@@ -114,6 +115,7 @@ export default function App() {
         {screen === "home" && <Home auth={auth} onNavigate={setScreen} />}
         {screen === "vpn" && <VPN />}
         {screen === "threats" && <Threats />}
+        {screen === "scan" && <Scan />}
         {screen === "settings" && (
           <Settings auth={auth} onLogout={handleLogout} />
         )}

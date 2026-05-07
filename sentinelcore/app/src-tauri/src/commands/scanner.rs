@@ -1,8 +1,100 @@
 use crate::commands::auth::get_token;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::io::Read;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 use std::time::Duration;
+use walkdir::WalkDir;
 
 const API_BASE: &str = "https://api.redgaurd.com";
+
+const KNOWN_BAD_HASHES: &str =
+    include_str!("../../../../signatures/malware_hashes.txt");
+
+static SCAN_RUNNING: OnceLock<AtomicBool> = OnceLock::new();
+
+fn scan_flag() -> &'static AtomicBool {
+    SCAN_RUNNING.get_or_init(|| AtomicBool::new(false))
+}
+
+const SCAN_EXTENSIONS: &[&str] = &[
+    "exe", "dll", "sys", "drv", "bat", "cmd", "ps1", "vbs", "js", "msi",
+];
+
+#[cfg(target_os = "windows")]
+const SCAN_DIRS: &[&str] = &[
+    "C:\\Users",
+    "C:\\Program Files",
+    "C:\\Program Files (x86)",
+    "C:\\ProgramData",
+    "C:\\Temp",
+    "C:\\Windows\\Temp",
+];
+
+#[cfg(not(target_os = "windows"))]
+const SCAN_DIRS: &[&str] = &["/home", "/tmp", "/var/tmp", "/usr/local/bin"];
+
+#[derive(Serialize, Clone)]
+pub struct ScanProgress {
+    pub scanned: u64,
+    pub threats: u64,
+    pub current_file: String,
+    pub done: bool,
+}
+
+#[derive(Serialize, Clone)]
+pub struct SystemThreat {
+    pub path: String,
+    pub sha256: String,
+    pub source: String,
+}
+
+fn sha256_file(path: &std::path::Path) -> Option<String> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buf).ok()?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+fn is_known_bad(hash: &str) -> bool {
+    KNOWN_BAD_HASHES
+        .lines()
+        .any(|line| line.trim().eq_ignore_ascii_case(hash))
+}
+
+fn check_hash_api(hash: &str, token: &str) -> bool {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok();
+    let Some(client) = client else { return false };
+    let Ok(resp) = client
+        .post(format!("{API_BASE}/api/v1/scan/hash"))
+        .bearer_auth(token)
+        .json(&serde_json::json!({ "hash": hash }))
+        .send()
+    else {
+        return false;
+    };
+    if !resp.status().is_success() {
+        return false;
+    }
+    let Ok(val) = resp.json::<serde_json::Value>() else {
+        return false;
+    };
+    matches!(
+        val.get("threat_level").and_then(|v| v.as_str()),
+        Some("MALICIOUS")
+    )
+}
 /// Maximum poll iterations before giving up waiting for scan result.
 const MAX_POLL_ITERATIONS: u32 = 30;
 /// Seconds between poll requests.
@@ -238,4 +330,112 @@ pub fn scan_file(path: String) -> Result<ScanResult, String> {
         "Scan timed out after {} seconds",
         MAX_POLL_ITERATIONS * POLL_INTERVAL_SECS as u32
     ))
+}
+
+#[tauri::command]
+pub fn cancel_scan() {
+    scan_flag().store(false, Ordering::Relaxed);
+}
+
+#[tauri::command]
+pub fn scan_system(window: tauri::Window) -> Result<Vec<SystemThreat>, String> {
+    if scan_flag().swap(true, Ordering::Relaxed) {
+        return Err("Scan already running".into());
+    }
+
+    let token = get_token().unwrap_or_default();
+    let mut scanned: u64 = 0;
+    let mut threats: Vec<SystemThreat> = Vec::new();
+    let mut api_calls: u32 = 0;
+    const MAX_API_CALLS: u32 = 60;
+
+    for dir in SCAN_DIRS {
+        if !scan_flag().load(Ordering::Relaxed) {
+            break;
+        }
+        let walker = WalkDir::new(dir)
+            .follow_links(false)
+            .same_file_system(true)
+            .into_iter();
+
+        for entry in walker.filter_map(|e| e.ok()) {
+            if !scan_flag().load(Ordering::Relaxed) {
+                break;
+            }
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            if !SCAN_EXTENSIONS.contains(&ext.as_str()) {
+                continue;
+            }
+            // Skip files over 50 MB
+            if entry.metadata().map(|m| m.len()).unwrap_or(0) > 50 * 1024 * 1024 {
+                continue;
+            }
+
+            scanned += 1;
+            let path_str = path.to_string_lossy().to_string();
+
+            // Emit progress every 10 files to avoid flooding the UI
+            if scanned % 10 == 0 {
+                let _ = window.emit(
+                    "scan-progress",
+                    ScanProgress {
+                        scanned,
+                        threats: threats.len() as u64,
+                        current_file: path_str.clone(),
+                        done: false,
+                    },
+                );
+            }
+
+            let Some(hash) = sha256_file(path) else {
+                continue;
+            };
+
+            // Local blocklist check (instant, no API)
+            if is_known_bad(&hash) {
+                threats.push(SystemThreat {
+                    path: path_str,
+                    sha256: hash,
+                    source: "local-blocklist".into(),
+                });
+                continue;
+            }
+
+            // API hash lookup (rate-limited to MAX_API_CALLS per scan)
+            if !token.is_empty() && api_calls < MAX_API_CALLS {
+                if check_hash_api(&hash, &token) {
+                    api_calls += 1;
+                    threats.push(SystemThreat {
+                        path: path_str,
+                        sha256: hash,
+                        source: "cloud-lookup".into(),
+                    });
+                } else {
+                    api_calls += 1;
+                }
+            }
+        }
+    }
+
+    scan_flag().store(false, Ordering::Relaxed);
+
+    let _ = window.emit(
+        "scan-progress",
+        ScanProgress {
+            scanned,
+            threats: threats.len() as u64,
+            current_file: String::new(),
+            done: true,
+        },
+    );
+
+    Ok(threats)
 }

@@ -32,6 +32,8 @@ pub fn run() {
             commands::scanner::get_threat_stats,
             commands::scanner::get_alerts,
             commands::scanner::scan_file,
+            commands::scanner::scan_system,
+            commands::scanner::cancel_scan,
             // tray / window
             commands::tray::update_tray_status,
             commands::tray::show_window,
