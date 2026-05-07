@@ -42,19 +42,28 @@ jobs:
         run: |
           cp src-tauri/target/release/bundle/nsis/*.exe RedGuard_Setup.exe
 
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedGuard-Windows-Setup
+          path: sentinelcore/app/RedGuard_Setup.exe
+          retention-days: 30
+
+  deploy:
+    needs: build-windows
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: RedGuard-Windows-Setup
+
       - name: Deploy installer to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: 159.65.237.42
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: sentinelcore/app/RedGuard_Setup.exe
+          source: RedGuard_Setup.exe
           target: /opt/redguard/downloads/
-          strip_components: 3
-
-      - name: Upload artifact (backup)
-        uses: actions/upload-artifact@v4
-        with:
-          name: RedGuard-Windows-Setup
-          path: sentinelcore/app/RedGuard_Setup.exe
-          retention-days: 30
