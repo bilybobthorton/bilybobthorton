@@ -13,39 +13,48 @@ Update after every major session.
 - 5 years hands-on cybersecurity experience
 - Goal: Build a globally recognized endpoint security company
 
-**Product:** SentinelCore
-- Malware detection + analysis platform
+**Product:** RedGuard (rebranded from SentinelCore in Session 10)
+- Downloadable AV + VPN desktop app (Windows first, Tauri-based)
+- Backend cloud API powers the agent silently
 - Target: Consumers, SMBs, Enterprise
-- Competitor benchmark: Malwarebytes, CrowdStrike Falcon, Carbon Black
+- Competitor benchmark: Malwarebytes, NordVPN, CrowdStrike Falcon
 
 ---
 
 ## Business Model
 
-### SentinelCore (Antivirus / Malware Detection)
+### RedGuard (Antivirus / Malware Detection)
 | Tier       | Price     | Features |
 |------------|-----------|----------|
 | Free       | $0        | 5 scans/day, static analysis, hash lookup |
 | Pro        | $9.99/mo  | Unlimited scans, ML scoring, custom YARA, endpoint agent, PDF reports |
 | Enterprise | $99+/mo   | API access, MISP integration, network IOC enrichment, SLA |
 
-### SentinelVPN
+### RedGuard VPN
 | Tier           | Price      | Features |
 |----------------|------------|----------|
 | VPN Free       | $0         | 1 location (US East), 10 GB/mo, 1 device |
 | VPN Pro        | $4.99/mo   | All locations, unlimited bandwidth, 5 devices, kill switch |
-| Security Bundle | $12.99/mo | VPN Pro + SentinelCore Pro — full-stack defense, 30% off vs separate |
+| Security Bundle | $12.99/mo | VPN Pro + RedGuard Pro — full-stack defense, 30% off vs separate |
 | Enterprise     | Custom     | Dedicated nodes, SIEM/MISP, policy management, 99.9% SLA |
 
-**Strategy:** Use SentinelCore (antivirus) as the acquisition channel, upsell to the Security Bundle. Same playbook as NordSecurity (Nord Threat Protection), Bitdefender Total Security, Norton 360. VPN market is 10× larger than standalone AV.
+**Strategy:** Customers buy on Shopify (redgaurd.com), download the RedGuard desktop app, it runs silently like a VPN. Same playbook as NordSecurity/Malwarebytes. VPN market is 10× larger than standalone AV.
 
 ---
 
-## Domain Name
+## Domain & Architecture
 
-**Status:** PURCHASED — `redgaurd.com` on Namecheap (Session 9, 2026-05-02)
-**Live domain:** https://redgaurd.com (pending TLS cert + deploy)
-**Shopify:** 3-month trial active — clarify use case (storefront vs marketing page vs billing)
+**redgaurd.com** → Shopify storefront (DNS stays at Shopify IP 23.227.38.65) — customer buys here
+**api.redgaurd.com** → DigitalOcean 159.65.237.42 — FastAPI backend, agent calls home here
+**dashboard.redgaurd.com** → DigitalOcean 159.65.237.42 — Next.js account portal
+
+DNS A records for `api` and `dashboard` subdomains added to Namecheap pointing to 159.65.237.42.
+redgaurd.com intentionally stays at Shopify — do NOT change that A record.
+
+**Shopify webhooks configured:**
+- Order payment → https://api.redgaurd.com/api/v1/shopify/webhook
+- Order cancellation → https://api.redgaurd.com/api/v1/shopify/webhook
+- Signing secret in .env as SHOPIFY_WEBHOOK_SECRET
 
 ---
 
@@ -67,13 +76,14 @@ Update after every major session.
 | Task queue | Celery + Redis |
 | Database | PostgreSQL 16 (asyncpg async + psycopg2 sync for Celery) |
 | Auth | JWT Bearer + X-API-Key header |
-| Billing | Stripe (Checkout Sessions, webhooks, Customer Portal) |
+| Billing | Shopify (webhooks → tier upgrade, no Stripe) |
 | Email | Resend (REST via httpx, no extra package) |
 | PDF generation | WeasyPrint 62.3 |
 | Endpoint agent | Rust (tokio, notify, sysinfo, reqwest) |
-| Dashboard | Next.js 14 + Tailwind CSS (App Router) |
+| Dashboard | Next.js 14 + Tailwind CSS (App Router) — account portal at dashboard.redgaurd.com |
+| Desktop app | Tauri 2.0 (Rust backend + React UI) — Windows AV+VPN client in sentinelcore/app/ |
 | Container | Docker Compose (dev) + docker-compose.prod.yml (prod) |
-| CI/CD | GitHub Actions (CI + SSH deploy on git tag) |
+| CI/CD | GitHub Actions (CI + SSH deploy on git tag + Windows app build) |
 | VPS | DigitalOcean — IP 159.65.237.42 (Ubuntu 22.04) |
 
 ---
@@ -181,16 +191,19 @@ Email alert fires after scan if MALICIOUS or SUSPICIOUS and user has RESEND_API_
 ## Live VPS
 
 - **IP:** 159.65.237.42 (DigitalOcean, NYC, Ubuntu 22.04)
-- **Domain:** redgaurd.com — PURCHASED on Namecheap (Session 9)
-- **Status:** server-setup.sh ran successfully; TLS cert not yet issued
 - **App dir:** `/opt/sentinelcore/sentinelcore/`
-- **Doubles as VPN node:** Run `scripts/setup-wireguard.sh` on this server to activate US East VPN location
-- **To finish deploy:**
-  1. Point Namecheap DNS A record → 159.65.237.42
-  2. SSH in: `bash scripts/init-letsencrypt.sh redgaurd.com kingtrevor981@gmail.com`
-  3. Update `.env`: `DOMAIN=redgaurd.com`, `APP_BASE_URL=https://redgaurd.com`
-  4. Restart: `make prod-down && make prod-up`
-- **After WireGuard setup:** set `VPN_SERVER_PUBLIC_KEY` + `VPN_SERVER_ENDPOINT=159.65.237.42:51820` in `.env`, restart API
+- **Status:** LIVE on HTTP — stack running, all containers healthy (Session 10)
+- **Admin account:** kingtrevor981@gmail.com — Enterprise tier, registered + upgraded via psql
+- **Downloads dir:** `/opt/redguard/downloads/` — create with `mkdir -p /opt/redguard/downloads`
+- **TLS:** not yet issued — needs DNS propagation for api/dashboard subdomains first
+- **WireGuard:** not yet set up on this server
+
+### Pending user actions (start of next session)
+1. `bash scripts/deploy.sh` — pick up all Session 10 fixes (history bug, alerts auth, download page, nginx)
+2. `mkdir -p /opt/redguard/downloads` — create downloads dir for installer hosting
+3. Add `DEPLOY_SSH_KEY` GitHub secret — go to github.com/bilybobthorton/bilybobthorton → Settings → Secrets → Actions → New secret, paste contents of `~/.ssh/id_rsa` from the server (or Mac)
+4. `git tag app-v0.1.1 && git push origin app-v0.1.1` — triggers Windows build + deploys .exe to server
+5. After DNS propagates: run `bash scripts/init-letsencrypt.sh` for api.redgaurd.com and dashboard.redgaurd.com
 
 ---
 
@@ -239,10 +252,19 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 
 ## TODO / Next Up
 
+### Immediate (next session start)
+- [ ] `bash scripts/deploy.sh` on server — picks up history fix, alerts fix, download page, nginx changes
+- [ ] `mkdir -p /opt/redguard/downloads` on server — needed for installer hosting
+- [ ] Add `DEPLOY_SSH_KEY` to GitHub repo secrets — allows Actions to SCP installer to server
+- [ ] `git tag app-v0.1.1 && git push origin app-v0.1.1` — triggers Windows .exe build
+- [ ] TLS certs — after DNS propagates for api/dashboard subdomains, run init-letsencrypt.sh
+
 ### Near-term (pre-public launch)
-- [ ] **Finish VPS deploy** — point redgaurd.com DNS → 159.65.237.42, run init-letsencrypt.sh, verify stack is live
 - [x] **Buy domain** — redgaurd.com purchased on Namecheap
-- [ ] **Clarify Shopify** — decide: storefront at redgaurd.com vs marketing page vs billing replacement
+- [x] **Architecture decided** — Shopify=storefront, api.redgaurd.com=backend, dashboard.redgaurd.com=portal
+- [x] **Rebrand** — SentinelCore → RedGuard throughout entire codebase
+- [x] **App deployed** — live at http://159.65.237.42, all containers healthy
+- [x] **Admin account** — kingtrevor981@gmail.com, Enterprise tier
 - [ ] **Run WireGuard on app server** — SSH 159.65.237.42, run setup-wireguard.sh, set VPN_SERVER_* in .env
 - [ ] **Train real ML model** — MalwareBazaar + clean Windows binaries, run `make train-real`
 - [ ] **Dedicated repo** — move sentinelcore/ out of bilybobthorton/bilybobthorton
@@ -374,6 +396,28 @@ User confirmed this works on their Mac (Python 3.9 compat fixed with `from __fut
 - Built `/history` page: scan table with threat badges, status pills, date, SHA256 snippet, links to reports
 - Settings page: trial banner with days-remaining + upgrade CTA, plan display, history link
 - Added History to nav
+
+### Session 10 — 2026-05-06
+- **Full rebrand:** SentinelCore → RedGuard across all 25+ files (UI, API, agent, emails, reports)
+- **Architecture pivot:** Product is now a downloadable desktop app (like Malwarebytes), not web-first
+  - redgaurd.com = Shopify storefront (DNS stays at Shopify)
+  - api.redgaurd.com = backend API (A record → 159.65.237.42)
+  - dashboard.redgaurd.com = account portal (A record → 159.65.237.42)
+- **Deployed to production:** Stack live at http://159.65.237.42 — all containers healthy
+- **Fixed deployment issues:** Redis password env var, nginx SENTINEL_DOMAIN placeholder, bcrypt 3.2.2 pin for passlib compat, migration 0008 not applying (deploy script wasn't building migrate image)
+- **Nginx:** HTTP-only config with subdomain routing for api/dashboard subdomains
+- **Admin account:** kingtrevor981@gmail.com registered and upgraded to Enterprise via psql
+- **Bug fixes:** History 500 (route order: /history was shadowed by /{scan_id}), alerts 401 (missing authHeaders on fetch)
+- **Tauri desktop app scaffolded** (`sentinelcore/app/`): Full Windows AV+VPN client
+  - Login → Home (shield status, toggles) → VPN (connect/disconnect) → Threats → Settings
+  - System tray with right-click menu
+  - Rust backend: auth, vpn, scanner, tray commands
+  - Connects to api.redgaurd.com for all data
+  - WireGuard managed silently via wireguard.exe
+- **Icons generated:** Red shield with "RG" — 32x32, 128x128, 256x256, icon.ico, tray-icon.png
+- **Download page:** /download on dashboard with install steps + direct download button
+- **GitHub Actions build:** .github/workflows/build-app.yml — builds Windows .exe on windows-latest runner, SCPs installer to /opt/redguard/downloads/ on server, served at dashboard.redgaurd.com/files/RedGuard_Setup.exe
+- **Shopify webhooks confirmed:** Both webhook URLs set to api.redgaurd.com/api/v1/shopify/webhook
 
 ### Session 9 — 2026-05-05
 - Replaced Stripe billing with Shopify

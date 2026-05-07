@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
@@ -21,6 +22,29 @@ router = APIRouter(prefix="/api/v1/vpn", tags=["vpn"])
 settings = get_settings()
 
 DEVICE_LIMITS = {"free": 1, "pro": 5, "enterprise": 25}
+
+
+def _check_vpn_access(user: User) -> None:
+    """Raise 402 if a free-tier user's VPN trial has expired."""
+    tier = user.tier or "free"
+    if tier in ("pro", "enterprise"):
+        return
+    # Free tier: allowed only during trial window
+    now = datetime.now(timezone.utc)
+    trial_end = user.trial_ends_at
+    if trial_end is None:
+        raise HTTPException(
+            status_code=402,
+            detail="vpn_trial_expired",
+        )
+    # Make trial_end timezone-aware if it isn't already
+    if trial_end.tzinfo is None:
+        trial_end = trial_end.replace(tzinfo=timezone.utc)
+    if now > trial_end:
+        raise HTTPException(
+            status_code=402,
+            detail="vpn_trial_expired",
+        )
 
 
 def _gen_keypair() -> tuple[str, str]:
@@ -61,6 +85,7 @@ async def list_keys(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _check_vpn_access(current_user)
     result = await db.execute(
         select(VpnKey).where(VpnKey.user_id == current_user.id).order_by(VpnKey.created_at)
     )
@@ -73,6 +98,7 @@ async def create_key(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _check_vpn_access(current_user)
     tier = current_user.tier or "free"
     limit = DEVICE_LIMITS.get(tier, 1)
 
@@ -126,6 +152,7 @@ async def download_config(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _check_vpn_access(current_user)
     result = await db.execute(
         select(VpnKey).where(
             VpnKey.id == uuid.UUID(key_id),

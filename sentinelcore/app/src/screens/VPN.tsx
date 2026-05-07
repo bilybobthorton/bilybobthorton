@@ -29,6 +29,7 @@ export default function VPN() {
   const [devices, setDevices] = useState<VpnDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [trialExpired, setTrialExpired] = useState(false);
 
   const loadStatus = async () => {
     try {
@@ -49,13 +50,18 @@ export default function VPN() {
 
   const handleConnect = async () => {
     setError(null);
+    setTrialExpired(false);
     setLoading(true);
     try {
-      // Auto-provisions a device if the user has none — no config needed.
       await invoke("connect_vpn");
       setStatus({ connected: true, server: "US East — New York" });
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      if (msg.includes("vpn_trial_expired") || msg.includes("402")) {
+        setTrialExpired(true);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -164,6 +170,40 @@ export default function VPN() {
             : "Connect"}
         </button>
       </div>
+
+      {trialExpired && (
+        <div style={{
+          marginBottom: 20,
+          padding: "16px 20px",
+          background: "#1c0a0a",
+          border: "1px solid #7f1d1d",
+          borderRadius: 10,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>
+            Your VPN trial has ended
+          </div>
+          <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>
+            Upgrade to RedGuard Pro or the Security Bundle to keep your VPN protection.
+          </div>
+          <a
+            href="https://redgaurd.com"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-block",
+              padding: "9px 20px",
+              background: "#dc2626",
+              color: "#fff",
+              borderRadius: 7,
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Upgrade now →
+          </a>
+        </div>
+      )}
 
       {error && (
         <div

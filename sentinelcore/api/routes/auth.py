@@ -14,7 +14,7 @@ from api.database import get_db
 from api.models.scan import User
 from api.services.email import send_verification_email
 
-TRIAL_DAYS = 14
+TRIAL_DAYS = 7  # Free users get 7 days of VPN access to drive Pro conversion
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
