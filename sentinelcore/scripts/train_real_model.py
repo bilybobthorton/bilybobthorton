@@ -195,6 +195,60 @@ def _get_hashes_malshare(api_key: str, target: int = 10000) -> list[str]:
     return hashes[:target]
 
 
+# ── theZoo offline source ─────────────────────────────────────────────────────
+
+def collect_from_theZoo(theZoo_path: Path, target: int) -> int:
+    """
+    Extract PE malware samples from a locally-cloned theZoo repo.
+    Clone it first:  git clone https://github.com/ytisf/theZoo
+    Provides ~600 real labelled malware binaries with no API key required.
+    """
+    MALWARE_DIR.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = {f.name for f in MALWARE_DIR.iterdir()}
+    collected = len(seen)
+    if collected >= target:
+        log.info("Already have %d malware samples — skipping theZoo extraction.", collected)
+        return collected
+
+    passwords = [b"infected", b"infected!", b"malware", b"virus", b"password", b"theZoo"]
+    log.info("Extracting malware from theZoo at %s ...", theZoo_path)
+
+    for zip_path in sorted(theZoo_path.rglob("*.zip")):
+        if collected >= target:
+            break
+        try:
+            with zipfile.ZipFile(zip_path) as zf:
+                extracted = False
+                for pwd in passwords:
+                    if extracted:
+                        break
+                    for name in zf.namelist():
+                        safe_name = Path(name).name  # strip any path component
+                        if not safe_name or safe_name in seen:
+                            continue
+                        try:
+                            data = zf.read(name, pwd=pwd)
+                        except Exception:
+                            continue
+                        if len(data) < 512:
+                            continue
+                        # Accept PE (MZ header) or any binary that's not text
+                        if data[:2] == b"MZ":
+                            dest = MALWARE_DIR / safe_name
+                            dest.write_bytes(data)
+                            seen.add(safe_name)
+                            collected += 1
+                            extracted = True
+                            if collected % 100 == 0:
+                                log.info("  Extracted %d malware samples so far...", collected)
+                            break  # one file per ZIP is fine
+        except Exception:
+            continue
+
+    log.info("theZoo extraction complete: %d malware samples in %s", collected, MALWARE_DIR)
+    return collected
+
+
 def _download_one_malshare(sha256: str, api_key: str, dest_dir: Path) -> bool:
     """Download one sample from Malshare directly (no ZIP, no password). Returns True on success."""
     import requests
@@ -245,17 +299,15 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
 
     if malshare_key:
         # Malshare path — simpler auth, raw binary download (no ZIP)
-        # Build combined hash pool: Malshare daily + MalwareBazaar CSV cross-reference
+        # Only use Malshare's own hash list — cross-referencing MB CSV doesn't work
+        # because the two databases have very little overlap.
         MALSHARE_DAILY_LIMIT = 2000
-        ms_hashes = _get_hashes_malshare(malshare_key, target=per_family * len(MALWARE_TAGS))
-        mb_hashes = _get_hashes_bulk_csv(target=MALSHARE_DAILY_LIMIT * 3)
-        combined: list[str] = list(dict.fromkeys(ms_hashes + mb_hashes))
-        log.info("Hash pool: %d total (Malshare daily=%d, MB CSV=%d)",
-                 len(combined), len(ms_hashes), len(mb_hashes))
+        ms_hashes = _get_hashes_malshare(malshare_key, target=MALSHARE_DAILY_LIMIT)
+        log.info("Malshare hash pool: %d", len(ms_hashes))
 
         already_have = {f.name for f in MALWARE_DIR.iterdir()}
-        todo = [h for h in combined if h[:24] not in already_have][:MALSHARE_DAILY_LIMIT]
-        log.info("Hashes to download: %d (capped at 2000/day Malshare limit)", len(todo))
+        todo = [h for h in ms_hashes if h[:24] not in already_have]
+        log.info("Hashes to download from Malshare: %d", len(todo))
 
     else:
         # MB-only path: get hash list from CSV
@@ -505,6 +557,8 @@ def main():
                     help="Parallel download workers (default: 50)")
     ap.add_argument("--estimators",    type=int, default=300,
                     help="RandomForest trees (default: 300)")
+    ap.add_argument("--theZoo",          type=Path, default=None,
+                    help="Path to a locally cloned theZoo repo (github.com/ytisf/theZoo) — no API key needed")
     ap.add_argument("--malshare-key",    default=os.environ.get("MALSHARE_KEY", ""),
                     help="Malshare API key — free at malshare.com/register.php  (or set MALSHARE_KEY env var)")
     ap.add_argument("--mb-api-key",      default=os.environ.get("MB_API_KEY", ""),
@@ -533,6 +587,8 @@ def main():
         sys.exit(1)
 
     if not args.skip_download:
+        if args.theZoo:
+            collect_from_theZoo(args.theZoo, target=args.malware_count * len(MALWARE_TAGS))
         download_malware(
             per_family=args.malware_count,
             threads=args.threads,
