@@ -299,15 +299,21 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
 
     if malshare_key:
         # Malshare path — simpler auth, raw binary download (no ZIP)
-        # Only use Malshare's own hash list — cross-referencing MB CSV doesn't work
-        # because the two databases have very little overlap.
+        # Malshare's own hashes: guaranteed downloadable from Malshare
+        # MB CSV hashes: tried against MB auth methods only (not Malshare cross-ref)
         MALSHARE_DAILY_LIMIT = 2000
         ms_hashes = _get_hashes_malshare(malshare_key, target=MALSHARE_DAILY_LIMIT)
-        log.info("Malshare hash pool: %d", len(ms_hashes))
+        mb_hashes = _get_hashes_bulk_csv(target=MALSHARE_DAILY_LIMIT * 5) if api_key else []
+        # Malshare hashes first (high success rate), then MB hashes (tried via MB auth)
+        combined = list(dict.fromkeys(ms_hashes + mb_hashes))
+        log.info("Hash pool: %d (Malshare=%d, MB CSV=%d)", len(combined), len(ms_hashes), len(mb_hashes))
 
         already_have = {f.name for f in MALWARE_DIR.iterdir()}
-        todo = [h for h in ms_hashes if h[:24] not in already_have]
-        log.info("Hashes to download from Malshare: %d", len(todo))
+        # Cap: Malshare daily limit applies only to Malshare downloads; MB downloads are separate
+        ms_todo = [h for h in ms_hashes if h[:24] not in already_have][:MALSHARE_DAILY_LIMIT]
+        mb_todo = [h for h in mb_hashes if h[:24] not in already_have and h not in ms_hashes]
+        todo = ms_todo + mb_todo
+        log.info("To download: %d Malshare + %d MB CSV = %d total", len(ms_todo), len(mb_todo), len(todo))
 
     else:
         # MB-only path: get hash list from CSV
@@ -365,30 +371,32 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
             except Exception:
                 pass
 
-        # 2. MalwareBazaar API endpoint
+        # 2–5. MalwareBazaar — try every plausible auth method
         if api_key:
-            try:
-                payload = {"query": "get_file", "sha256_hash": sha256, "api_key": api_key}
-                r = requests.post(MB_API, data=payload, headers=_MB_HEADERS, timeout=60)
-                ct = r.headers.get("content-type", "")
-                if r.status_code == 200 and "json" not in ct and "html" not in ct:
-                    if _save(r.content):
-                        return True
-            except Exception:
-                pass
-
-        # 3. MalwareBazaar direct sample URL
-        if api_key:
-            try:
-                hdrs = {**_MB_HEADERS, "Authorization": f"Token {api_key}"}
-                r = requests.get(f"https://bazaar.abuse.ch/sample/{sha256}/",
-                                 headers=hdrs, timeout=60, allow_redirects=True)
-                ct = r.headers.get("content-type", "")
-                if r.status_code == 200 and "html" not in ct:
-                    if _save(r.content):
-                        return True
-            except Exception:
-                pass
+            mb_attempts = [
+                # (method, url, extra_headers, post_data)
+                ("POST", MB_API, {},
+                 {"query": "get_file", "sha256_hash": sha256, "api_key": api_key}),
+                ("POST", MB_API, {"Auth-Key": api_key},
+                 {"query": "get_file", "sha256_hash": sha256}),
+                ("POST", MB_API, {"Authorization": f"Token {api_key}"},
+                 {"query": "get_file", "sha256_hash": sha256}),
+                ("GET",  f"https://bazaar.abuse.ch/sample/{sha256}/",
+                 {"Auth-Key": api_key, "Authorization": f"Token {api_key}"}, None),
+            ]
+            for method, url, extra_hdrs, post_data in mb_attempts:
+                try:
+                    hdrs = {**_MB_HEADERS, **extra_hdrs}
+                    if method == "POST":
+                        r = requests.post(url, data=post_data, headers=hdrs, timeout=60)
+                    else:
+                        r = requests.get(url, headers=hdrs, timeout=60, allow_redirects=True)
+                    ct = r.headers.get("content-type", "")
+                    if r.status_code == 200 and "html" not in ct:
+                        if _save(r.content):
+                            return True
+                except Exception:
+                    pass
 
         return False
 
