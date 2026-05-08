@@ -175,18 +175,21 @@ def _get_hashes_malshare(api_key: str, target: int = 10000) -> list[str]:
         )
         r.raise_for_status()
         text = r.text.strip()
-        log.debug("Malshare raw response (first 300 chars): %s", text[:300])
-        if "error" in text[:80].lower() or not text:
+        if not text or "error" in text[:80].lower():
             log.error("Malshare error response: %s", text[:300])
             return []
-        # Accept MD5 (32 chars) or SHA256 (64 chars) hex strings
-        hashes = [
-            h.strip() for h in text.splitlines()
-            if len(h.strip()) in (32, 64) and all(c in "0123456789abcdefABCDEF" for c in h.strip())
-        ]
+        # Response is JSON: [{"md5":"...","sha1":"...","sha256":"..."}, ...]
+        try:
+            import json as _json
+            data = _json.loads(text)
+            hashes = [item["sha256"] for item in data if item.get("sha256")]
+        except Exception:
+            # Fallback: plain text, one hash per line
+            hashes = [
+                h.strip() for h in text.splitlines()
+                if len(h.strip()) in (32, 64) and all(c in "0123456789abcdefABCDEF" for c in h.strip())
+            ]
         log.info("Malshare: %d hashes in today's list", len(hashes))
-        if not hashes:
-            log.warning("Response was not empty but no hashes parsed. First 300 chars: %s", text[:300])
     except Exception as e:
         log.warning("Malshare hash list failed: %s", e)
     return hashes[:target]
