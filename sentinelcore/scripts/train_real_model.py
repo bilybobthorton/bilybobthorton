@@ -246,16 +246,21 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
     if malshare_key:
         # Malshare path — simpler auth, raw binary download (no ZIP)
         log.info("Using Malshare for downloads.")
-        hashes = _get_hashes_malshare(malshare_key, target=per_family * len(MALWARE_TAGS))
-        if not hashes:
-            log.warning("Malshare today's list is empty — falling back to MalwareBazaar CSV hashes.")
-            bulk = _get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS))
-            hashes = bulk
-        if not hashes:
-            log.error("No hashes available from any source. Check your Malshare API key.")
-            sys.exit(1)
-        todo = [h for h in hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
-        log.info("Hashes to download: %d", len(todo))
+        # Today's Malshare uploads
+        hashes: list[str] = _get_hashes_malshare(malshare_key, target=per_family * len(MALWARE_TAGS))
+
+        # Cross-reference MalwareBazaar CSV hashes against Malshare's historical database.
+        # Malshare stores many of the same samples — this gives us thousands of candidates.
+        MALSHARE_DAILY_LIMIT = 2000
+        mb_hashes = _get_hashes_bulk_csv(target=MALSHARE_DAILY_LIMIT * 3)
+        combined: list[str] = list(dict.fromkeys(hashes + mb_hashes))  # deduplicate, preserve order
+        log.info("Combined hash pool: %d (Malshare daily: %d, MB CSV: %d)",
+                 len(combined), len(hashes), len(mb_hashes))
+
+        # Cap at daily download limit
+        already_have = {f.name for f in MALWARE_DIR.iterdir()}
+        todo = [h for h in combined if h[:24] not in already_have][:MALSHARE_DAILY_LIMIT]
+        log.info("Hashes to download: %d (capped at Malshare's 2000/day free limit)", len(todo))
 
         ok = errors = 0
 
