@@ -41,6 +41,9 @@ pub fn run() {
             commands::scanner::scan_file,
             commands::scanner::scan_system,
             commands::scanner::cancel_scan,
+            // vulnerabilities
+            commands::vuln::get_installed_software,
+            commands::vuln::scan_vulnerabilities,
             // tray / window
             commands::tray::update_tray_status,
             commands::tray::show_window,

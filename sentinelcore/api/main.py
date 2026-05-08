@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.config import get_settings
 from api.routes import health, scan
 from api.routes import auth, agent, admin, yara_rules, ml, report, enterprise, shopify
-from api.routes import webhooks, vpn, stats
+from api.routes import webhooks, vpn, stats, vuln
 
 settings = get_settings()
 
@@ -40,3 +40,4 @@ app.include_router(enterprise.router)
 app.include_router(webhooks.router)
 app.include_router(vpn.router)
 app.include_router(stats.router)
+app.include_router(vuln.router)

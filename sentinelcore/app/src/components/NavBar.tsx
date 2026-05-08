@@ -1,4 +1,4 @@
-import { Shield, Globe, AlertTriangle, Settings, LogOut, ScanLine } from "lucide-react";
+import { Shield, Globe, AlertTriangle, Settings, LogOut, ScanLine, ShieldAlert } from "lucide-react";
 import type { Screen } from "../App";
 import StatusBadge from "./StatusBadge";
 
@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "scan", label: "Scan", icon: <ScanLine size={18} /> },
   { id: "vpn", label: "VPN", icon: <Globe size={18} /> },
   { id: "threats", label: "Threats", icon: <AlertTriangle size={18} /> },
+  { id: "vulnerabilities", label: "Vulns", icon: <ShieldAlert size={18} /> },
   { id: "settings", label: "Settings", icon: <Settings size={18} /> },
 ];
 
