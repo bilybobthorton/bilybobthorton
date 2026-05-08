@@ -157,8 +157,11 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
         return []
 
 
+_dl_verbose_count = 0  # log first few failures in detail
+
 def _download_one(sha256: str, dest_dir: Path, api_key: str = "") -> bool:
     """Download + extract one sample ZIP from MalwareBazaar. Returns True on success."""
+    global _dl_verbose_count
     import requests
     dest = dest_dir / sha256[:24]
     if dest.exists() and dest.stat().st_size > 0:
@@ -168,9 +171,20 @@ def _download_one(sha256: str, dest_dir: Path, api_key: str = "") -> bool:
         if api_key:
             payload["api_key"] = api_key
         r = requests.post(MB_API, data=payload, timeout=60, stream=True)
+        ct = r.headers.get("content-type", "")
         if r.status_code != 200:
+            if _dl_verbose_count < 3:
+                log.warning("Download failed hash=%s HTTP=%d", sha256[:16], r.status_code)
+                _dl_verbose_count += 1
             return False
-        if "json" in r.headers.get("content-type", ""):
+        if "json" in ct:
+            if _dl_verbose_count < 3:
+                try:
+                    j = r.json()
+                    log.warning("Download JSON error hash=%s: %s", sha256[:16], j.get("query_status"))
+                except Exception:
+                    log.warning("Download JSON error hash=%s: %s", sha256[:16], r.content[:120])
+                _dl_verbose_count += 1
             return False
         raw = r.content
         with zipfile.ZipFile(io.BytesIO(raw)) as zf:
@@ -178,35 +192,52 @@ def _download_one(sha256: str, dest_dir: Path, api_key: str = "") -> bool:
                 data = zf.read(name, pwd=ZIP_PASS)
                 dest.write_bytes(data)
                 return True
-    except Exception:
-        pass
+    except Exception as e:
+        if _dl_verbose_count < 3:
+            log.warning("Download exception hash=%s: %s", sha256[:16], e)
+            _dl_verbose_count += 1
     return False
 
 
 def _check_mb_auth(api_key: str) -> bool:
-    """Test one download to confirm auth is working. Returns True if OK."""
+    """Test an actual file download to confirm access is working. Returns True if OK."""
     import requests
-    # Query the info endpoint — doesn't download a file, just verifies the key works
+    # A well-known sample that's been in MalwareBazaar since early on
     CANARY_HASH = "3351f5e08bbd479b919e7120ddfdd1912c1e3564a627722040ac9581c08180ef"
     try:
-        payload: dict = {"query": "get_info", "hash": CANARY_HASH}
+        payload: dict = {"query": "get_file", "sha256_hash": CANARY_HASH}
         if api_key:
             payload["api_key"] = api_key
-        r = requests.post(MB_API, data=payload, timeout=15)
-        j = r.json()
-        status = j.get("query_status", "")
-        if status in ("ok", "no_results"):
-            return True
-        if status == "illegal_apikey":
-            log.error("MalwareBazaar API key is invalid. Check --mb-api-key or MB_API_KEY env var.")
+        r = requests.post(MB_API, data=payload, timeout=30)
+        ct = r.headers.get("content-type", "")
+        log.info("Auth test — HTTP %d  content-type: %s  size: %d bytes",
+                 r.status_code, ct, len(r.content))
+
+        if r.status_code != 200:
+            log.error("Download auth test failed: HTTP %d", r.status_code)
             return False
-        # If no api_key was passed, we get unauthorized
-        if not api_key and "unauthorized" in status.lower():
+
+        if "json" in ct:
+            try:
+                j = r.json()
+                qs = j.get("query_status", "")
+                log.error("MalwareBazaar returned JSON error: query_status=%r  full=%s", qs, j)
+                if qs == "illegal_apikey":
+                    log.error("  → API key is invalid or wrong. Check --mb-api-key value.")
+                elif qs == "file_not_found":
+                    log.warning("  → Canary hash not found — trying download anyway (most hashes may be unavailable).")
+                    return True  # Key might be fine; hash just not hosted
+                elif qs == "unauthorized":
+                    log.error("  → API key required. Sign up at bazaar.abuse.ch and use --mb-api-key.")
+            except Exception:
+                log.error("  → Response body: %s", r.content[:300])
             return False
+
+        log.info("Auth test PASSED — file download works ✓")
         return True
     except Exception as e:
-        log.warning("Auth check failed: %s", e)
-        return False
+        log.warning("Auth check exception: %s — proceeding anyway", e)
+        return True
 
 
 def download_malware(per_family: int, threads: int, api_key: str = "") -> Path:
