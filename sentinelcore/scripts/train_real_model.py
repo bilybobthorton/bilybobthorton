@@ -31,6 +31,11 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+# ── PYTHONPATH fix — must run before any engine imports ──────────────────────
+_repo_root = Path(__file__).parent.parent
+if str(_repo_root) not in sys.path:
+    sys.path.insert(0, str(_repo_root))
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -73,6 +78,9 @@ PE_TYPES = {"exe", "dll", "sys", "drv"}
 
 # ── MalwareBazaar helpers ─────────────────────────────────────────────────────
 
+MB_BULK_CSV = "https://bazaar.abuse.ch/export/csv/full/"
+
+
 def _mb_post(data: dict, timeout: int = 30) -> dict:
     import requests
     r = requests.post(MB_API, data=data, timeout=timeout)
@@ -80,24 +88,60 @@ def _mb_post(data: dict, timeout: int = 30) -> dict:
     return r.json()
 
 
-def _get_hashes_for_tag(tag: str, limit: int = 1000) -> list[str]:
+def _get_hashes_recent(limit: int = 1000) -> list[str]:
+    """Recent PE hashes — no API key required."""
     try:
-        res = _mb_post({"query": "get_taginfo", "tag": tag, "limit": str(limit)})
-        if res.get("query_status") not in ("ok", "tag_info"):
+        res = _mb_post({"query": "get_recent", "selector": str(min(limit, 1000))})
+        if res.get("query_status") != "ok":
             return []
         return [
             s["sha256_hash"]
             for s in res.get("data", [])
-            if (s.get("file_type") or "").lower() in PE_TYPES
-            and s.get("sha256_hash")
+            if (s.get("file_type") or "").lower() in PE_TYPES and s.get("sha256_hash")
         ]
     except Exception as e:
-        log.warning("Tag '%s' query failed: %s", tag, e)
+        log.warning("get_recent failed: %s", e)
+        return []
+
+
+def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
+    """
+    Download the full MalwareBazaar CSV export and extract PE SHA256 hashes.
+    No API key required. ~50 MB download, thousands of diverse samples.
+    """
+    import csv
+    import requests
+    log.info("Downloading MalwareBazaar full CSV export (~50 MB)...")
+    try:
+        r = requests.get(MB_BULK_CSV, timeout=180, stream=True)
+        r.raise_for_status()
+        raw = r.content
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            csv_name = next((n for n in zf.namelist() if n.endswith(".csv")), None)
+            if not csv_name:
+                log.warning("No CSV found in bulk export ZIP")
+                return []
+            csv_text = zf.read(csv_name).decode("utf-8", errors="replace")
+
+        hashes = []
+        lines = [l for l in csv_text.splitlines() if not l.startswith("#")]
+        reader = csv.DictReader(lines)
+        for row in reader:
+            ft = (row.get("file_type") or row.get("filetype") or "").lower().strip('"')
+            sha = (row.get("sha256_hash") or row.get("sha256") or "").strip('"')
+            if sha and ft in PE_TYPES:
+                hashes.append(sha)
+            if len(hashes) >= target:
+                break
+        log.info("Bulk CSV: %d PE hashes found.", len(hashes))
+        return hashes
+    except Exception as e:
+        log.warning("Bulk CSV download failed: %s", e)
         return []
 
 
 def _download_one(sha256: str, dest_dir: Path) -> bool:
-    """Download + extract one sample. Returns True on success."""
+    """Download + extract one sample ZIP. Returns True on success."""
     import requests
     dest = dest_dir / sha256[:24]
     if dest.exists() and dest.stat().st_size > 0:
@@ -129,26 +173,28 @@ def download_malware(per_family: int, threads: int) -> Path:
     existing = {f.name for f in MALWARE_DIR.iterdir()}
     log.info("Already have %d malware samples locally.", len(existing))
 
-    # Collect hashes across all families
-    all_hashes: set[str] = set()
-    for tag in MALWARE_TAGS:
-        hashes = _get_hashes_for_tag(tag, per_family)
-        log.info("  %-15s → %d PE samples", tag, len(hashes))
-        all_hashes.update(hashes)
-        time.sleep(0.5)  # gentle on the API
+    # Strategy 1: bulk CSV (no auth, thousands of diverse hashes)
+    all_hashes: set[str] = set(existing)  # pre-seed with existing so we skip them
+    bulk = _get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS))
+    all_hashes.update(bulk)
 
-    # Remove already-downloaded
-    todo = [h for h in all_hashes if h[:24] not in existing]
-    log.info("Need to download %d new samples (%d unique total).", len(todo), len(all_hashes))
+    # Strategy 2: recent samples as top-up
+    if len(all_hashes) < 500:
+        log.info("Falling back to get_recent...")
+        all_hashes.update(_get_hashes_recent(1000))
+
+    # Only download what we don't have yet
+    todo = [h for h in all_hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
+    log.info("Hashes to download: %d", len(todo))
 
     if not todo:
+        log.info("Nothing to download.")
         return MALWARE_DIR
 
     ok = errors = 0
 
-    def _dl(sha256: str):
-        # Stagger slightly to avoid hammering the API
-        time.sleep(0.1)
+    def _dl(sha256: str) -> bool:
+        time.sleep(0.05)
         return _download_one(sha256, MALWARE_DIR)
 
     with ThreadPoolExecutor(max_workers=threads) as pool:
@@ -158,11 +204,11 @@ def download_malware(per_family: int, threads: int) -> Path:
                 ok += 1
             else:
                 errors += 1
-            if i % 200 == 0:
+            if i % 500 == 0:
                 log.info("  %d / %d  (ok=%d err=%d)", i, len(todo), ok, errors)
 
-    log.info("Download complete: %d downloaded, %d errors. Total: %d",
-             ok, errors, len(list(MALWARE_DIR.iterdir())))
+    total = len(list(MALWARE_DIR.iterdir()))
+    log.info("Download complete: %d ok, %d errors. Total on disk: %d", ok, errors, total)
     return MALWARE_DIR
 
 
