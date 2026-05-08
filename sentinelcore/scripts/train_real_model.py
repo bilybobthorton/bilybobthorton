@@ -594,9 +594,11 @@ def main():
         log.error("Run: pip install requests scikit-learn pefile numpy lief yara-python")
         sys.exit(1)
 
+    # theZoo extraction always runs when --theZoo is set (not gated by --skip-download)
+    if args.theZoo:
+        collect_from_theZoo(args.theZoo, target=args.malware_count * len(MALWARE_TAGS))
+
     if not args.skip_download:
-        if args.theZoo:
-            collect_from_theZoo(args.theZoo, target=args.malware_count * len(MALWARE_TAGS))
         download_malware(
             per_family=args.malware_count,
             threads=args.threads,
@@ -605,7 +607,7 @@ def main():
         )
         collect_benign(target=args.benign_count)
     else:
-        log.info("Skipping download — using existing samples in %s", SAMPLES_DIR)
+        log.info("Skipping network download — using existing samples in %s", SAMPLES_DIR)
 
     model = run_training(
         MALWARE_DIR, BENIGN_DIR, args.output, args.estimators,
