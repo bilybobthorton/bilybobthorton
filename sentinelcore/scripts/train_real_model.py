@@ -157,19 +157,17 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
         return []
 
 
-def _download_one(sha256: str, dest_dir: Path) -> bool:
-    """Download + extract one sample ZIP. Returns True on success."""
+def _download_one(sha256: str, dest_dir: Path, api_key: str = "") -> bool:
+    """Download + extract one sample ZIP from MalwareBazaar. Returns True on success."""
     import requests
     dest = dest_dir / sha256[:24]
     if dest.exists() and dest.stat().st_size > 0:
         return True
     try:
-        r = requests.post(
-            MB_API,
-            data={"query": "get_file", "sha256_hash": sha256},
-            timeout=60,
-            stream=True,
-        )
+        payload: dict = {"query": "get_file", "sha256_hash": sha256}
+        if api_key:
+            payload["api_key"] = api_key
+        r = requests.post(MB_API, data=payload, timeout=60, stream=True)
         if r.status_code != 200:
             return False
         if "json" in r.headers.get("content-type", ""):
@@ -185,13 +183,39 @@ def _download_one(sha256: str, dest_dir: Path) -> bool:
     return False
 
 
-def download_malware(per_family: int, threads: int) -> Path:
+def _check_mb_auth(api_key: str) -> bool:
+    """Test one download to confirm auth is working. Returns True if OK."""
+    import requests
+    # Query the info endpoint — doesn't download a file, just verifies the key works
+    CANARY_HASH = "3351f5e08bbd479b919e7120ddfdd1912c1e3564a627722040ac9581c08180ef"
+    try:
+        payload: dict = {"query": "get_info", "hash": CANARY_HASH}
+        if api_key:
+            payload["api_key"] = api_key
+        r = requests.post(MB_API, data=payload, timeout=15)
+        j = r.json()
+        status = j.get("query_status", "")
+        if status in ("ok", "no_results"):
+            return True
+        if status == "illegal_apikey":
+            log.error("MalwareBazaar API key is invalid. Check --mb-api-key or MB_API_KEY env var.")
+            return False
+        # If no api_key was passed, we get unauthorized
+        if not api_key and "unauthorized" in status.lower():
+            return False
+        return True
+    except Exception as e:
+        log.warning("Auth check failed: %s", e)
+        return False
+
+
+def download_malware(per_family: int, threads: int, api_key: str = "") -> Path:
     MALWARE_DIR.mkdir(parents=True, exist_ok=True)
     existing = {f.name for f in MALWARE_DIR.iterdir()}
     log.info("Already have %d malware samples locally.", len(existing))
 
     # Strategy 1: bulk CSV (no auth, thousands of diverse hashes)
-    all_hashes: set[str] = set(existing)  # pre-seed with existing so we skip them
+    all_hashes: set[str] = set(existing)
     bulk = _get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS))
     all_hashes.update(bulk)
 
@@ -200,7 +224,6 @@ def download_malware(per_family: int, threads: int) -> Path:
         log.info("Falling back to get_recent...")
         all_hashes.update(_get_hashes_recent(1000))
 
-    # Only download what we don't have yet
     todo = [h for h in all_hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
     log.info("Hashes to download: %d", len(todo))
 
@@ -208,11 +231,25 @@ def download_malware(per_family: int, threads: int) -> Path:
         log.info("Nothing to download.")
         return MALWARE_DIR
 
+    # Verify auth before launching thousands of threads
+    log.info("Checking MalwareBazaar download access...")
+    if not _check_mb_auth(api_key):
+        log.error(
+            "\n"
+            "  MalwareBazaar requires a free API key to download samples.\n"
+            "\n"
+            "  1. Sign up free at: https://bazaar.abuse.ch/signup/\n"
+            "  2. Copy your API key from your profile page\n"
+            "  3. Re-run with:  python scripts/train_real_model.py --mb-api-key YOUR_KEY\n"
+            "     OR set env:   set MB_API_KEY=YOUR_KEY  (then re-run)\n"
+        )
+        sys.exit(1)
+
     ok = errors = 0
 
     def _dl(sha256: str) -> bool:
         time.sleep(0.02)
-        return _download_one(sha256, MALWARE_DIR)
+        return _download_one(sha256, MALWARE_DIR, api_key=api_key)
 
     with ThreadPoolExecutor(max_workers=threads) as pool:
         futures = {pool.submit(_dl, h): h for h in todo}
@@ -379,6 +416,8 @@ def main():
                     help="Parallel download workers (default: 50)")
     ap.add_argument("--estimators",    type=int, default=300,
                     help="RandomForest trees (default: 300)")
+    ap.add_argument("--mb-api-key",      default=os.environ.get("MB_API_KEY", ""),
+                    help="MalwareBazaar API key — free at bazaar.abuse.ch/signup/  (or set MB_API_KEY env var)")
     ap.add_argument("--skip-download",  action="store_true",
                     help="Use existing scripts/samples/ directory")
     ap.add_argument("--skip-features",  action="store_true",
@@ -403,7 +442,7 @@ def main():
         sys.exit(1)
 
     if not args.skip_download:
-        download_malware(per_family=args.malware_count, threads=args.threads)
+        download_malware(per_family=args.malware_count, threads=args.threads, api_key=args.mb_api_key)
         collect_benign(target=args.benign_count)
     else:
         log.info("Skipping download — using existing samples in %s", SAMPLES_DIR)
