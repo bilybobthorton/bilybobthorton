@@ -157,133 +157,153 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
         return []
 
 
-_dl_verbose_count = 0  # log first few failures in detail
+# ── Malshare helpers ──────────────────────────────────────────────────────────
 
-def _download_one(sha256: str, dest_dir: Path, api_key: str = "") -> bool:
-    """Download + extract one sample ZIP from MalwareBazaar. Returns True on success."""
-    global _dl_verbose_count
+MALSHARE_API = "https://malshare.com/api.php"
+
+
+def _get_hashes_malshare(api_key: str, target: int = 10000) -> list[str]:
+    """Fetch recent SHA256 hashes from Malshare (no daily ZIP limit on hash list)."""
+    import requests
+    log.info("Fetching hash list from Malshare...")
+    hashes: list[str] = []
+    try:
+        r = requests.get(
+            MALSHARE_API,
+            params={"api_key": api_key, "action": "getlist"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        text = r.text.strip()
+        if "error" in text[:80].lower():
+            log.error("Malshare error response: %s", text[:200])
+            return []
+        hashes = [h.strip() for h in text.splitlines() if len(h.strip()) == 64]
+        log.info("Malshare: %d SHA256 hashes in today's list", len(hashes))
+    except Exception as e:
+        log.warning("Malshare hash list failed: %s", e)
+    return hashes[:target]
+
+
+def _download_one_malshare(sha256: str, api_key: str, dest_dir: Path) -> bool:
+    """Download one sample from Malshare directly (no ZIP, no password). Returns True on success."""
     import requests
     dest = dest_dir / sha256[:24]
     if dest.exists() and dest.stat().st_size > 0:
         return True
     try:
-        payload: dict = {"query": "get_file", "sha256_hash": sha256}
-        if api_key:
-            payload["api_key"] = api_key
-        r = requests.post(MB_API, data=payload, timeout=60, stream=True)
-        ct = r.headers.get("content-type", "")
+        r = requests.get(
+            MALSHARE_API,
+            params={"api_key": api_key, "action": "getfile", "hash": sha256},
+            timeout=60,
+            stream=True,
+        )
         if r.status_code != 200:
-            if _dl_verbose_count < 3:
-                log.warning("Download failed hash=%s HTTP=%d", sha256[:16], r.status_code)
-                _dl_verbose_count += 1
             return False
-        if "json" in ct:
-            if _dl_verbose_count < 3:
-                try:
-                    j = r.json()
-                    log.warning("Download JSON error hash=%s: %s", sha256[:16], j.get("query_status"))
-                except Exception:
-                    log.warning("Download JSON error hash=%s: %s", sha256[:16], r.content[:120])
-                _dl_verbose_count += 1
+        ct = r.headers.get("content-type", "")
+        if "text" in ct or "json" in ct or "html" in ct:
             return False
         raw = r.content
-        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            for name in zf.namelist():
-                data = zf.read(name, pwd=ZIP_PASS)
-                dest.write_bytes(data)
-                return True
-    except Exception as e:
-        if _dl_verbose_count < 3:
-            log.warning("Download exception hash=%s: %s", sha256[:16], e)
-            _dl_verbose_count += 1
+        if len(raw) < 512:
+            return False
+        dest.write_bytes(raw)
+        return True
+    except Exception:
+        pass
     return False
 
 
-def _check_mb_auth(api_key: str) -> bool:
-    """Test an actual file download to confirm access is working. Returns True if OK."""
-    import requests
-    # A well-known sample that's been in MalwareBazaar since early on
-    CANARY_HASH = "3351f5e08bbd479b919e7120ddfdd1912c1e3564a627722040ac9581c08180ef"
-    try:
-        payload: dict = {"query": "get_file", "sha256_hash": CANARY_HASH}
-        if api_key:
-            payload["api_key"] = api_key
-        r = requests.post(MB_API, data=payload, timeout=30)
-        ct = r.headers.get("content-type", "")
-        log.info("Auth test — HTTP %d  content-type: %s  size: %d bytes",
-                 r.status_code, ct, len(r.content))
-
-        if r.status_code != 200:
-            log.error("Download auth test failed: HTTP %d", r.status_code)
-            return False
-
-        if "json" in ct:
-            try:
-                j = r.json()
-                qs = j.get("query_status", "")
-                log.error("MalwareBazaar returned JSON error: query_status=%r  full=%s", qs, j)
-                if qs == "illegal_apikey":
-                    log.error("  → API key is invalid or wrong. Check --mb-api-key value.")
-                elif qs == "file_not_found":
-                    log.warning("  → Canary hash not found — trying download anyway (most hashes may be unavailable).")
-                    return True  # Key might be fine; hash just not hosted
-                elif qs == "unauthorized":
-                    log.error("  → API key required. Sign up at bazaar.abuse.ch and use --mb-api-key.")
-            except Exception:
-                log.error("  → Response body: %s", r.content[:300])
-            return False
-
-        log.info("Auth test PASSED — file download works ✓")
-        return True
-    except Exception as e:
-        log.warning("Auth check exception: %s — proceeding anyway", e)
-        return True
-
-
-def download_malware(per_family: int, threads: int, api_key: str = "") -> Path:
+def download_malware(per_family: int, threads: int, api_key: str = "", malshare_key: str = "") -> Path:
     MALWARE_DIR.mkdir(parents=True, exist_ok=True)
     existing = {f.name for f in MALWARE_DIR.iterdir()}
     log.info("Already have %d malware samples locally.", len(existing))
 
-    # Strategy 1: bulk CSV (no auth, thousands of diverse hashes)
-    all_hashes: set[str] = set(existing)
+    if not api_key and not malshare_key:
+        log.error(
+            "\n"
+            "  No download API key provided. You need one of:\n"
+            "\n"
+            "  Option A — Malshare (recommended, easiest):\n"
+            "    1. Sign up free at malshare.com/register.php\n"
+            "    2. Re-run: python scripts/train_real_model.py --malshare-key YOUR_KEY\n"
+            "\n"
+            "  Option B — MalwareBazaar:\n"
+            "    1. Sign up free at bazaar.abuse.ch/signup/\n"
+            "    2. Re-run: python scripts/train_real_model.py --mb-api-key YOUR_KEY\n"
+        )
+        sys.exit(1)
+
+    if malshare_key:
+        # Malshare path — simpler auth, raw binary download (no ZIP)
+        log.info("Using Malshare for downloads.")
+        hashes = _get_hashes_malshare(malshare_key, target=per_family * len(MALWARE_TAGS))
+        if not hashes:
+            log.error("Could not retrieve hashes from Malshare. Check your API key.")
+            sys.exit(1)
+        todo = [h for h in hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
+        log.info("Hashes to download: %d", len(todo))
+
+        ok = errors = 0
+
+        def _dl_ms(sha256: str) -> bool:
+            time.sleep(0.05)  # Malshare is rate-limited; be polite
+            return _download_one_malshare(sha256, malshare_key, MALWARE_DIR)
+
+        with ThreadPoolExecutor(max_workers=min(threads, 20)) as pool:
+            futures = {pool.submit(_dl_ms, h): h for h in todo}
+            for i, fut in enumerate(as_completed(futures), 1):
+                if fut.result():
+                    ok += 1
+                else:
+                    errors += 1
+                if i % 200 == 0:
+                    log.info("  %d / %d  (ok=%d err=%d)", i, len(todo), ok, errors)
+
+        total = len(list(MALWARE_DIR.iterdir()))
+        log.info("Download complete: %d ok, %d errors. Total on disk: %d", ok, errors, total)
+        return MALWARE_DIR
+
+    # MalwareBazaar path — get hash list from CSV, download with API key
+    all_hashes: set[str] = set()
     bulk = _get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS))
     all_hashes.update(bulk)
-
-    # Strategy 2: recent samples as top-up
     if len(all_hashes) < 500:
-        log.info("Falling back to get_recent...")
         all_hashes.update(_get_hashes_recent(1000))
 
     todo = [h for h in all_hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
-    log.info("Hashes to download: %d", len(todo))
+    log.info("Hashes to download: %d (via MalwareBazaar)", len(todo))
 
     if not todo:
         log.info("Nothing to download.")
         return MALWARE_DIR
 
-    # Verify auth before launching thousands of threads
-    log.info("Checking MalwareBazaar download access...")
-    if not _check_mb_auth(api_key):
-        log.error(
-            "\n"
-            "  MalwareBazaar requires a free API key to download samples.\n"
-            "\n"
-            "  1. Sign up free at: https://bazaar.abuse.ch/signup/\n"
-            "  2. Copy your API key from your profile page\n"
-            "  3. Re-run with:  python scripts/train_real_model.py --mb-api-key YOUR_KEY\n"
-            "     OR set env:   set MB_API_KEY=YOUR_KEY  (then re-run)\n"
-        )
-        sys.exit(1)
-
     ok = errors = 0
 
-    def _dl(sha256: str) -> bool:
+    def _dl_mb(sha256: str) -> bool:
         time.sleep(0.02)
-        return _download_one(sha256, MALWARE_DIR, api_key=api_key)
+        dest = MALWARE_DIR / sha256[:24]
+        if dest.exists() and dest.stat().st_size > 0:
+            return True
+        import requests
+        try:
+            payload: dict = {"query": "get_file", "sha256_hash": sha256, "api_key": api_key}
+            r = requests.post(MB_API, data=payload, timeout=60, stream=True)
+            if r.status_code != 200:
+                return False
+            if "json" in r.headers.get("content-type", ""):
+                return False
+            raw = r.content
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                for name in zf.namelist():
+                    data = zf.read(name, pwd=ZIP_PASS)
+                    dest.write_bytes(data)
+                    return True
+        except Exception:
+            pass
+        return False
 
     with ThreadPoolExecutor(max_workers=threads) as pool:
-        futures = {pool.submit(_dl, h): h for h in todo}
+        futures = {pool.submit(_dl_mb, h): h for h in todo}
         for i, fut in enumerate(as_completed(futures), 1):
             if fut.result():
                 ok += 1
@@ -447,6 +467,8 @@ def main():
                     help="Parallel download workers (default: 50)")
     ap.add_argument("--estimators",    type=int, default=300,
                     help="RandomForest trees (default: 300)")
+    ap.add_argument("--malshare-key",    default=os.environ.get("MALSHARE_KEY", ""),
+                    help="Malshare API key — free at malshare.com/register.php  (or set MALSHARE_KEY env var)")
     ap.add_argument("--mb-api-key",      default=os.environ.get("MB_API_KEY", ""),
                     help="MalwareBazaar API key — free at bazaar.abuse.ch/signup/  (or set MB_API_KEY env var)")
     ap.add_argument("--skip-download",  action="store_true",
@@ -473,7 +495,12 @@ def main():
         sys.exit(1)
 
     if not args.skip_download:
-        download_malware(per_family=args.malware_count, threads=args.threads, api_key=args.mb_api_key)
+        download_malware(
+            per_family=args.malware_count,
+            threads=args.threads,
+            api_key=args.mb_api_key,
+            malshare_key=args.malshare_key,
+        )
         collect_benign(target=args.benign_count)
     else:
         log.info("Skipping download — using existing samples in %s", SAMPLES_DIR)
