@@ -108,6 +108,11 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
     """
     Download the full MalwareBazaar CSV export and extract PE SHA256 hashes.
     No API key required. ~50 MB download, thousands of diverse samples.
+
+    MalwareBazaar CSV has NO header row — column names live in #-prefixed comment
+    lines that we must skip. Positional layout (0-indexed):
+      0=first_seen  1=sha256_hash  2=md5  3=sha1  4=reporter
+      5=file_name   6=file_type_guess  7=mime_type  ...
     """
     import csv
     import requests
@@ -123,37 +128,27 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
                 return []
             csv_text = zf.read(csv_name).decode("utf-8", errors="replace")
 
-        hashes = []
-        lines = [l for l in csv_text.splitlines() if not l.startswith("#")]
-        reader = csv.DictReader(lines)
-        # Log actual column names on first row so we can debug mismatches
-        first_row = next(iter(reader), None)
-        if first_row:
-            log.info("CSV columns: %s", list(first_row.keys()))
-            # MalwareBazaar uses 'file_type_guess', not 'file_type'
-            ft_key = next(
-                (k for k in first_row if "file_type" in k.lower() or "filetype" in k.lower()),
-                None,
-            )
-            sha_key = next(
-                (k for k in first_row if "sha256" in k.lower()),
-                None,
-            )
-            log.info("Using ft_key=%s  sha_key=%s", ft_key, sha_key)
-            if ft_key and sha_key:
-                # Process first row
-                ft = first_row.get(ft_key, "").lower().strip('"').strip()
-                sha = first_row.get(sha_key, "").strip('"').strip()
+        # Column indices in the headerless CSV
+        SHA256_COL = 1
+        FTYPE_COL  = 6
+
+        hashes: list[str] = []
+        for line in csv_text.splitlines():
+            if not line or line.startswith("#"):
+                continue
+            try:
+                row = next(csv.reader([line]))
+                if len(row) <= max(SHA256_COL, FTYPE_COL):
+                    continue
+                sha = row[SHA256_COL].strip().strip('"')
+                ft  = row[FTYPE_COL].strip().strip('"').lower()
                 if sha and ft in PE_TYPES:
                     hashes.append(sha)
-                # Process rest
-                for row in reader:
-                    ft = row.get(ft_key, "").lower().strip('"').strip()
-                    sha = row.get(sha_key, "").strip('"').strip()
-                    if sha and ft in PE_TYPES:
-                        hashes.append(sha)
-                    if len(hashes) >= target:
-                        break
+                if len(hashes) >= target:
+                    break
+            except Exception:
+                continue
+
         log.info("Bulk CSV: %d PE hashes found.", len(hashes))
         return hashes
     except Exception as e:
