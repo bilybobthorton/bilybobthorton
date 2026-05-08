@@ -293,24 +293,53 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
 
     ok = errors = 0
 
+    _MB_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0",
+        "Accept": "application/zip, application/octet-stream, */*",
+        "Referer": "https://bazaar.abuse.ch/",
+    }
+
     def _dl_mb(sha256: str) -> bool:
         time.sleep(0.02)
         dest = MALWARE_DIR / sha256[:24]
         if dest.exists() and dest.stat().st_size > 0:
             return True
         import requests
+
+        def _try_extract(raw: bytes) -> bool:
+            try:
+                with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                    for name in zf.namelist():
+                        dest.write_bytes(zf.read(name, pwd=ZIP_PASS))
+                        return True
+            except Exception:
+                pass
+            # Not a ZIP — might be a raw PE (some endpoints return unwrapped binary)
+            if len(raw) > 512 and raw[:2] == b"MZ":
+                dest.write_bytes(raw)
+                return True
+            return False
+
         try:
-            payload: dict = {"query": "get_file", "sha256_hash": sha256, "api_key": api_key}
-            r = requests.post(MB_API, data=payload, timeout=60, stream=True)
-            if r.status_code != 200:
-                return False
-            if "json" in r.headers.get("content-type", ""):
-                return False
-            raw = r.content
-            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-                for name in zf.namelist():
-                    data = zf.read(name, pwd=ZIP_PASS)
-                    dest.write_bytes(data)
+            # Attempt 1: official API endpoint
+            payload = {"query": "get_file", "sha256_hash": sha256}
+            if api_key:
+                payload["api_key"] = api_key
+            r = requests.post(MB_API, data=payload, headers=_MB_HEADERS, timeout=60)
+            ct = r.headers.get("content-type", "")
+            if r.status_code == 200 and "json" not in ct and "html" not in ct:
+                if _try_extract(r.content):
+                    return True
+
+            # Attempt 2: direct sample URL (different auth path)
+            direct = f"https://bazaar.abuse.ch/sample/{sha256}/"
+            hdrs2 = {**_MB_HEADERS}
+            if api_key:
+                hdrs2["Authorization"] = f"Token {api_key}"
+            r2 = requests.get(direct, headers=hdrs2, timeout=60, allow_redirects=True)
+            ct2 = r2.headers.get("content-type", "")
+            if r2.status_code == 200 and "html" not in ct2:
+                if _try_extract(r2.content):
                     return True
         except Exception:
             pass
