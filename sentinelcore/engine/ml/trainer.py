@@ -85,22 +85,39 @@ def _build_classifier(n_estimators: int, use_gpu: bool):
     )
 
 
-def _collect_features(directory: Path, label: int, max_files: int = 5000):
-    X, y = [], []
-    files = list(directory.rglob("*"))
-    files = [f for f in files if f.is_file()][:max_files]
-    logger.info("Processing %d files from %s (label=%d)", len(files), directory, label)
+def _collect_features(directory: Path, label: int, max_files: int = 5000, workers: int = 0):
+    from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
+    import os
 
-    for i, fp in enumerate(files):
-        if i % 100 == 0:
-            logger.info("  %d / %d", i, len(files))
+    if workers <= 0:
+        workers = min(32, (os.cpu_count() or 4))
+
+    files = [f for f in directory.rglob("*") if f.is_file()][:max_files]
+    logger.info(
+        "Extracting features: %d files from %s (label=%d, workers=%d)",
+        len(files), directory, label, workers,
+    )
+
+    X, y = [], []
+    done = 0
+
+    def _extract(fp: Path):
         try:
-            result = analyze_file(fp)
-            feats = extract_features(result)
-            X.append(feats)
-            y.append(label)
+            return extract_features(analyze_file(fp))
         except Exception as e:
             logger.debug("Skip %s: %s", fp.name, e)
+            return None
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_extract, f): f for f in files}
+        for fut in _as_completed(futures):
+            done += 1
+            feats = fut.result()
+            if feats is not None:
+                X.append(feats)
+                y.append(label)
+            if done % 500 == 0:
+                logger.info("  %d / %d extracted", done, len(files))
 
     return X, y
 
@@ -113,12 +130,30 @@ def train(
     max_files: int = 5000,
     threshold: float = 0.5,
     use_gpu: bool = True,
+    workers: int = 0,
+    feature_cache: Path | None = None,
 ) -> MalwareClassifier:
     from sklearn.metrics import classification_report, roc_auc_score
     from sklearn.model_selection import train_test_split
 
-    Xm, ym = _collect_features(malware_dir, label=1, max_files=max_files)
-    Xb, yb = _collect_features(benign_dir, label=0, max_files=max_files)
+    # Load cached features if available (skips slow per-file extraction)
+    if feature_cache and feature_cache.exists():
+        logger.info("Loading cached features from %s", feature_cache)
+        data = np.load(feature_cache)
+        Xm, ym = list(data["Xm"]), list(data["ym"].astype(int))
+        Xb, yb = list(data["Xb"]), list(data["yb"].astype(int))
+        logger.info("Cache loaded: %d malware, %d benign", len(Xm), len(Xb))
+    else:
+        Xm, ym = _collect_features(malware_dir, label=1, max_files=max_files, workers=workers)
+        Xb, yb = _collect_features(benign_dir,  label=0, max_files=max_files, workers=workers)
+        if feature_cache:
+            feature_cache.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(
+                feature_cache,
+                Xm=np.array(Xm, dtype=float), ym=np.array(ym, dtype=int),
+                Xb=np.array(Xb, dtype=float), yb=np.array(yb, dtype=int),
+            )
+            logger.info("Features cached → %s  (use --skip-features to skip extraction next run)", feature_cache)
 
     if len(Xm) == 0:
         logger.error(

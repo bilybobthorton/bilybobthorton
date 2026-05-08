@@ -45,12 +45,13 @@ log = logging.getLogger("trainer")
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 
-SCRIPT_DIR  = Path(__file__).parent
-REPO_ROOT   = SCRIPT_DIR.parent
-SAMPLES_DIR = SCRIPT_DIR / "samples"
-MALWARE_DIR = SAMPLES_DIR / "malware"
-BENIGN_DIR  = SAMPLES_DIR / "benign"
-DEFAULT_OUT = REPO_ROOT / "engine" / "ml" / "sentinel_rf.pkl"
+SCRIPT_DIR    = Path(__file__).parent
+REPO_ROOT     = SCRIPT_DIR.parent
+SAMPLES_DIR   = SCRIPT_DIR / "samples"
+MALWARE_DIR   = SAMPLES_DIR / "malware"
+BENIGN_DIR    = SAMPLES_DIR / "benign"
+FEATURES_CACHE = SAMPLES_DIR / "features_cache.npz"
+DEFAULT_OUT   = REPO_ROOT / "engine" / "ml" / "sentinel_rf.pkl"
 
 MB_API      = "https://mb-api.abuse.ch/api/v1/"
 ZIP_PASS    = b"infected"
@@ -210,7 +211,7 @@ def download_malware(per_family: int, threads: int) -> Path:
     ok = errors = 0
 
     def _dl(sha256: str) -> bool:
-        time.sleep(0.05)
+        time.sleep(0.02)
         return _download_one(sha256, MALWARE_DIR)
 
     with ThreadPoolExecutor(max_workers=threads) as pool:
@@ -297,7 +298,14 @@ def collect_benign(target: int) -> Path:
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
-def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: int, use_gpu: bool = True):
+def run_training(
+    malware_dir: Path,
+    benign_dir: Path,
+    output: Path,
+    estimators: int,
+    use_gpu: bool = True,
+    skip_features: bool = False,
+):
     try:
         from engine.ml.trainer import train
     except ImportError:
@@ -308,9 +316,19 @@ def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: 
         )
         sys.exit(1)
 
-    m_count = len(list(malware_dir.iterdir()))
-    b_count = len(list(benign_dir.iterdir()))
-    log.info("Training on %d malware + %d benign = %d total samples", m_count, b_count, m_count + b_count)
+    cache = FEATURES_CACHE if skip_features else FEATURES_CACHE
+    # skip_features=True: must load from cache (error if missing)
+    if skip_features and not cache.exists():
+        log.error(
+            "--skip-features specified but no cache found at %s\n"
+            "Run without --skip-features first to build the cache.", cache
+        )
+        sys.exit(1)
+    # skip_features=False: always re-extract and update cache
+    if not skip_features:
+        m_count = len(list(malware_dir.iterdir()))
+        b_count = len(list(benign_dir.iterdir()))
+        log.info("Extracting features: %d malware + %d benign files", m_count, b_count)
 
     return train(
         malware_dir=malware_dir,
@@ -319,6 +337,7 @@ def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: 
         n_estimators=estimators,
         max_files=20000,
         use_gpu=use_gpu,
+        feature_cache=cache,
     )
 
 
@@ -356,13 +375,15 @@ def main():
                     help="Samples per malware family (default: 1000, × 15 families = ~15k)")
     ap.add_argument("--benign-count",  type=int, default=8000,
                     help="Benign samples to collect (default: 8000)")
-    ap.add_argument("--threads",       type=int, default=20,
-                    help="Parallel download workers (default: 20)")
+    ap.add_argument("--threads",       type=int, default=50,
+                    help="Parallel download workers (default: 50)")
     ap.add_argument("--estimators",    type=int, default=300,
                     help="RandomForest trees (default: 300)")
-    ap.add_argument("--skip-download", action="store_true",
+    ap.add_argument("--skip-download",  action="store_true",
                     help="Use existing scripts/samples/ directory")
-    ap.add_argument("--no-gpu",        action="store_true",
+    ap.add_argument("--skip-features",  action="store_true",
+                    help="Load cached feature vectors instead of re-running analyze_file on every sample")
+    ap.add_argument("--no-gpu",         action="store_true",
                     help="Force CPU training (default: use CUDA if available)")
     ap.add_argument("--output",        type=Path, default=DEFAULT_OUT)
     ap.add_argument("--upload",        action="store_true",
@@ -387,7 +408,11 @@ def main():
     else:
         log.info("Skipping download — using existing samples in %s", SAMPLES_DIR)
 
-    model = run_training(MALWARE_DIR, BENIGN_DIR, args.output, args.estimators, use_gpu=not args.no_gpu)
+    model = run_training(
+        MALWARE_DIR, BENIGN_DIR, args.output, args.estimators,
+        use_gpu=not args.no_gpu,
+        skip_features=args.skip_features,
+    )
 
     log.info("")
     log.info("=" * 60)
