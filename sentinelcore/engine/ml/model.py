@@ -1,5 +1,5 @@
 """
-RandomForest malware classifier.
+RedGuard ML malware classifier — wraps XGBoost (preferred) or RandomForest.
 
 Usage:
   from engine.ml.model import get_model

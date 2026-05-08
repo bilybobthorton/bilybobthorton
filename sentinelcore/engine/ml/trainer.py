@@ -1,5 +1,5 @@
 """
-Offline trainer for the RedGuard RandomForest classifier.
+Offline trainer for the RedGuard ML classifier (XGBoost GPU-accelerated or RandomForest).
 
 Run this script against a labeled dataset of malware/benign PE files:
 
@@ -31,6 +31,60 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def _build_classifier(n_estimators: int, use_gpu: bool):
+    """Return best available classifier: XGBoost/CUDA → XGBoost/CPU → RandomForest."""
+    try:
+        import xgboost as xgb
+        xgb_params = dict(
+            n_estimators=n_estimators,
+            max_depth=8,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            scale_pos_weight=1,
+            eval_metric="logloss",
+            random_state=42,
+            n_jobs=-1,
+        )
+        if use_gpu:
+            try:
+                # XGBoost >= 2.0 API
+                clf = xgb.XGBClassifier(device="cuda", **xgb_params)
+                # Quick smoke-test to verify CUDA is actually available
+                import numpy as _np
+                _X = _np.zeros((4, 2), dtype=float)
+                _y = _np.array([0, 1, 0, 1])
+                clf.fit(_X, _y)
+                logger.info("Using XGBoost with CUDA (RTX 4070) ✓")
+                return clf
+            except Exception as e:
+                logger.warning("CUDA init failed (%s) — trying XGBoost CPU", e)
+                try:
+                    clf = xgb.XGBClassifier(tree_method="hist", **xgb_params)
+                    logger.info("Using XGBoost CPU (hist method)")
+                    return clf
+                except Exception as e2:
+                    logger.warning("XGBoost CPU also failed (%s) — falling back to RandomForest", e2)
+        else:
+            clf = xgb.XGBClassifier(tree_method="hist", **xgb_params)
+            logger.info("Using XGBoost CPU (--no-gpu flag)")
+            return clf
+    except ImportError:
+        logger.warning("xgboost not installed — using RandomForest. Run: pip install xgboost")
+
+    from sklearn.ensemble import RandomForestClassifier
+    logger.info("Using RandomForest (n_estimators=%d, all CPU cores)", n_estimators)
+    return RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=None,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        class_weight="balanced",
+        n_jobs=-1,
+        random_state=42,
+    )
+
+
 def _collect_features(directory: Path, label: int, max_files: int = 5000):
     X, y = [], []
     files = list(directory.rglob("*"))
@@ -58,58 +112,67 @@ def train(
     n_estimators: int = 200,
     max_files: int = 5000,
     threshold: float = 0.5,
+    use_gpu: bool = True,
 ) -> MalwareClassifier:
-    from sklearn.ensemble import RandomForestClassifier
     from sklearn.metrics import classification_report, roc_auc_score
     from sklearn.model_selection import train_test_split
 
     Xm, ym = _collect_features(malware_dir, label=1, max_files=max_files)
     Xb, yb = _collect_features(benign_dir, label=0, max_files=max_files)
 
+    if len(Xm) == 0:
+        logger.error(
+            "0 malware samples were successfully extracted.\n"
+            "  → Make sure scripts/samples/malware/ has downloaded files.\n"
+            "  → Re-run train_real_model.py without --skip-download."
+        )
+        sys.exit(1)
+    if len(Xb) == 0:
+        logger.error("0 benign samples — cannot train without both classes.")
+        sys.exit(1)
+    if len(Xm) < 10 or len(Xb) < 10:
+        logger.error(
+            "Too few samples (malware=%d, benign=%d) — need at least 10 per class.",
+            len(Xm), len(Xb),
+        )
+        sys.exit(1)
+
     X = np.array(Xm + Xb, dtype=float)
     y = np.array(ym + yb, dtype=int)
 
-    if len(X) == 0:
-        logger.error("No samples collected — aborting")
-        sys.exit(1)
-
-    logger.info("Dataset: %d malware, %d benign", len(Xm), len(Xb))
+    logger.info("Dataset: %d malware + %d benign = %d total", len(Xm), len(Xb), len(X))
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    clf = RandomForestClassifier(
-        n_estimators=n_estimators,
-        max_depth=None,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        class_weight="balanced",
-        n_jobs=-1,
-        random_state=42,
-    )
-
-    logger.info("Training RandomForest with %d estimators...", n_estimators)
+    clf = _build_classifier(n_estimators=n_estimators, use_gpu=use_gpu)
+    clf_name = type(clf).__name__
+    logger.info("Training %s on %d samples...", clf_name, len(X_train))
     clf.fit(X_train, y_train)
 
     y_pred = clf.predict(X_test)
-    y_prob = clf.predict_proba(X_test)[:, 1]
-
-    logger.info("\n%s", classification_report(y_test, y_pred, target_names=["benign", "malicious"]))
     try:
-        auc = roc_auc_score(y_test, y_prob)
+        y_prob = clf.predict_proba(X_test)
+        mal_idx = list(clf.classes_).index(1) if hasattr(clf, "classes_") and 1 in clf.classes_ else 1
+        y_prob_mal = y_prob[:, mal_idx]
+        logger.info("\n%s", classification_report(y_test, y_pred, target_names=["benign", "malicious"]))
+        auc = roc_auc_score(y_test, y_prob_mal)
         logger.info("AUC-ROC: %.4f", auc)
+    except Exception as e:
+        logger.warning("Could not compute probabilities/AUC: %s", e)
+
+    # Feature importance (XGBoost and RandomForest both expose feature_importances_)
+    try:
+        importances = sorted(
+            zip(FEATURE_NAMES, clf.feature_importances_),
+            key=lambda x: x[1], reverse=True,
+        )
+        logger.info("Top 10 features:")
+        for name, imp in importances[:10]:
+            logger.info("  %-35s %.4f", name, imp)
     except Exception:
         pass
-
-    # Feature importance
-    importances = sorted(
-        zip(FEATURE_NAMES, clf.feature_importances_),
-        key=lambda x: x[1], reverse=True
-    )
-    logger.info("Top 10 features:")
-    for name, imp in importances[:10]:
-        logger.info("  %-35s %.4f", name, imp)
 
     model = MalwareClassifier(clf=clf, threshold=threshold)
     model.save(output)
@@ -231,6 +294,11 @@ def main():
         action="store_true",
         help="Generate synthetic dev model (no real dataset needed)",
     )
+    parser.add_argument(
+        "--no-gpu",
+        action="store_true",
+        help="Force CPU training even if CUDA is available",
+    )
     args = parser.parse_args()
 
     if args.synthetic:
@@ -243,6 +311,7 @@ def main():
             n_estimators=args.estimators,
             max_files=args.max_files,
             threshold=args.threshold,
+            use_gpu=not args.no_gpu,
         )
     else:
         parser.print_help()

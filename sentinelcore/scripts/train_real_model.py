@@ -126,13 +126,34 @@ def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
         hashes = []
         lines = [l for l in csv_text.splitlines() if not l.startswith("#")]
         reader = csv.DictReader(lines)
-        for row in reader:
-            ft = (row.get("file_type") or row.get("filetype") or "").lower().strip('"')
-            sha = (row.get("sha256_hash") or row.get("sha256") or "").strip('"')
-            if sha and ft in PE_TYPES:
-                hashes.append(sha)
-            if len(hashes) >= target:
-                break
+        # Log actual column names on first row so we can debug mismatches
+        first_row = next(iter(reader), None)
+        if first_row:
+            log.info("CSV columns: %s", list(first_row.keys()))
+            # MalwareBazaar uses 'file_type_guess', not 'file_type'
+            ft_key = next(
+                (k for k in first_row if "file_type" in k.lower() or "filetype" in k.lower()),
+                None,
+            )
+            sha_key = next(
+                (k for k in first_row if "sha256" in k.lower()),
+                None,
+            )
+            log.info("Using ft_key=%s  sha_key=%s", ft_key, sha_key)
+            if ft_key and sha_key:
+                # Process first row
+                ft = first_row.get(ft_key, "").lower().strip('"').strip()
+                sha = first_row.get(sha_key, "").strip('"').strip()
+                if sha and ft in PE_TYPES:
+                    hashes.append(sha)
+                # Process rest
+                for row in reader:
+                    ft = row.get(ft_key, "").lower().strip('"').strip()
+                    sha = row.get(sha_key, "").strip('"').strip()
+                    if sha and ft in PE_TYPES:
+                        hashes.append(sha)
+                    if len(hashes) >= target:
+                        break
         log.info("Bulk CSV: %d PE hashes found.", len(hashes))
         return hashes
     except Exception as e:
@@ -281,7 +302,7 @@ def collect_benign(target: int) -> Path:
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
-def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: int):
+def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: int, use_gpu: bool = True):
     try:
         from engine.ml.trainer import train
     except ImportError:
@@ -302,6 +323,7 @@ def run_training(malware_dir: Path, benign_dir: Path, output: Path, estimators: 
         output=output,
         n_estimators=estimators,
         max_files=20000,
+        use_gpu=use_gpu,
     )
 
 
@@ -345,6 +367,8 @@ def main():
                     help="RandomForest trees (default: 300)")
     ap.add_argument("--skip-download", action="store_true",
                     help="Use existing scripts/samples/ directory")
+    ap.add_argument("--no-gpu",        action="store_true",
+                    help="Force CPU training (default: use CUDA if available)")
     ap.add_argument("--output",        type=Path, default=DEFAULT_OUT)
     ap.add_argument("--upload",        action="store_true",
                     help="SCP model to server after training")
@@ -368,7 +392,7 @@ def main():
     else:
         log.info("Skipping download — using existing samples in %s", SAMPLES_DIR)
 
-    model = run_training(MALWARE_DIR, BENIGN_DIR, args.output, args.estimators)
+    model = run_training(MALWARE_DIR, BENIGN_DIR, args.output, args.estimators, use_gpu=not args.no_gpu)
 
     log.info("")
     log.info("=" * 60)
