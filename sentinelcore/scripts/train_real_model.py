@@ -163,7 +163,7 @@ MALSHARE_API = "https://malshare.com/api.php"
 
 
 def _get_hashes_malshare(api_key: str, target: int = 10000) -> list[str]:
-    """Fetch recent SHA256 hashes from Malshare (no daily ZIP limit on hash list)."""
+    """Fetch recent hashes from Malshare (returns MD5 or SHA256 depending on action)."""
     import requests
     log.info("Fetching hash list from Malshare...")
     hashes: list[str] = []
@@ -175,11 +175,18 @@ def _get_hashes_malshare(api_key: str, target: int = 10000) -> list[str]:
         )
         r.raise_for_status()
         text = r.text.strip()
-        if "error" in text[:80].lower():
-            log.error("Malshare error response: %s", text[:200])
+        log.debug("Malshare raw response (first 300 chars): %s", text[:300])
+        if "error" in text[:80].lower() or not text:
+            log.error("Malshare error response: %s", text[:300])
             return []
-        hashes = [h.strip() for h in text.splitlines() if len(h.strip()) == 64]
-        log.info("Malshare: %d SHA256 hashes in today's list", len(hashes))
+        # Accept MD5 (32 chars) or SHA256 (64 chars) hex strings
+        hashes = [
+            h.strip() for h in text.splitlines()
+            if len(h.strip()) in (32, 64) and all(c in "0123456789abcdefABCDEF" for c in h.strip())
+        ]
+        log.info("Malshare: %d hashes in today's list", len(hashes))
+        if not hashes:
+            log.warning("Response was not empty but no hashes parsed. First 300 chars: %s", text[:300])
     except Exception as e:
         log.warning("Malshare hash list failed: %s", e)
     return hashes[:target]
@@ -238,7 +245,11 @@ def download_malware(per_family: int, threads: int, api_key: str = "", malshare_
         log.info("Using Malshare for downloads.")
         hashes = _get_hashes_malshare(malshare_key, target=per_family * len(MALWARE_TAGS))
         if not hashes:
-            log.error("Could not retrieve hashes from Malshare. Check your API key.")
+            log.warning("Malshare today's list is empty — falling back to MalwareBazaar CSV hashes.")
+            bulk = _get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS))
+            hashes = bulk
+        if not hashes:
+            log.error("No hashes available from any source. Check your Malshare API key.")
             sys.exit(1)
         todo = [h for h in hashes if h[:24] not in {f.name for f in MALWARE_DIR.iterdir()}]
         log.info("Hashes to download: %d", len(todo))
