@@ -151,12 +151,21 @@ def _download_mb_daily_feeds(days_back: int = 30, parallel: int = 8) -> int:
         day_str = day.strftime("%Y-%m-%d")
         url = f"{MB_DAILY_FEED}{day_str}.zip"
         try:
-            r = requests.get(url, timeout=300)
+            r = requests.get(url, timeout=300, stream=True)
             if r.status_code == 404:
+                log.debug("  %s — 404 (not published yet)", day_str)
                 return 0
             r.raise_for_status()
-            raw = r.content
-            # Thread-safe extraction: lock around seen set + disk writes
+            # Stream with progress so it's not silent
+            chunks = []
+            downloaded = 0
+            for chunk in r.iter_content(chunk_size=1024 * 256):  # 256 KB chunks
+                chunks.append(chunk)
+                downloaded += len(chunk)
+                if downloaded % (1024 * 1024 * 10) < 1024 * 256:  # log every ~10 MB
+                    log.info("  %s downloading... %.1f MB", day_str, downloaded / 1024 / 1024)
+            raw = b"".join(chunks)
+            log.info("  %s download done (%.1f MB) — extracting...", day_str, len(raw) / 1024 / 1024)
             with seen_lock:
                 new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=day_str)
             log.info("  %s → %d PE samples", day_str, new)
@@ -525,6 +534,10 @@ def collect_benign(target: int) -> Path:
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
+BENIGN_CACHE  = SAMPLES_DIR / "benign_features.npz"   # benign-only cache (slow to re-extract)
+MALWARE_CACHE = SAMPLES_DIR / "malware_features.npz"  # malware-only cache (fast, re-extract when stale)
+
+
 def run_training(
     malware_dir: Path,
     benign_dir: Path,
@@ -533,39 +546,118 @@ def run_training(
     use_gpu: bool = True,
     skip_features: bool = False,
 ):
+    """
+    Smart feature caching: benign features are expensive (6k+ Windows system files).
+    Malware features are always re-extracted so new downloads are picked up.
+    --skip-features loads benign from cache + re-extracts malware (best of both).
+    """
+    import numpy as np
+
     try:
         from engine.ml.trainer import train
+        from engine.ml.features import extract_features
+        from engine.static.analyzer import analyze_file
     except ImportError:
         log.error(
-            "Cannot import engine.ml.trainer.\n"
+            "Cannot import engine modules.\n"
             "Run from sentinelcore/ directory:\n"
             "  cd sentinelcore && python scripts/train_real_model.py"
         )
         sys.exit(1)
 
-    cache = FEATURES_CACHE if skip_features else FEATURES_CACHE
-    # skip_features=True: must load from cache (error if missing)
-    if skip_features and not cache.exists():
-        log.error(
-            "--skip-features specified but no cache found at %s\n"
-            "Run without --skip-features first to build the cache.", cache
+    if skip_features:
+        # Load benign from cache (saves ~20 min), re-extract malware (picks up new samples)
+        if not BENIGN_CACHE.exists() and not FEATURES_CACHE.exists():
+            log.error(
+                "--skip-features: no benign cache found.\n"
+                "Run without --skip-features once to build it."
+            )
+            sys.exit(1)
+
+        # Load benign features
+        if BENIGN_CACHE.exists():
+            bd = np.load(BENIGN_CACHE)
+            Xb = list(bd["Xb"])
+            yb = list(bd["yb"].astype(int))
+            log.info("Loaded %d benign features from cache.", len(Xb))
+        else:
+            # Fall back to old combined cache
+            fd = np.load(FEATURES_CACHE)
+            Xb = list(fd["Xb"])
+            yb = list(fd["yb"].astype(int))
+            log.info("Loaded %d benign features from combined cache.", len(Xb))
+
+        # Always re-extract malware so new downloads are included
+        m_files = [f for f in malware_dir.rglob("*") if f.is_file()]
+        log.info("Extracting features from %d malware files (skipping benign re-extraction)...", len(m_files))
+
+        from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+        import os as _os
+
+        workers = min(32, _os.cpu_count() or 4)
+        Xm, ym = [], []
+        done = 0
+
+        def _feat(fp):
+            try:
+                return extract_features(analyze_file(fp))
+            except Exception:
+                return None
+
+        with _TPE(max_workers=workers) as pool:
+            futs = {pool.submit(_feat, f): f for f in m_files}
+            for fut in _ac(futs):
+                done += 1
+                r = fut.result()
+                if r is not None:
+                    Xm.append(r)
+                    ym.append(1)
+                if done % 500 == 0:
+                    log.info("  %d / %d malware features extracted", done, len(m_files))
+
+        log.info("Malware feature extraction complete: %d / %d succeeded.", len(Xm), len(m_files))
+
+        # Save updated malware cache + combined cache
+        SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(MALWARE_CACHE, Xm=np.array(Xm, dtype=float), ym=np.array(ym, dtype=int))
+        np.savez_compressed(
+            FEATURES_CACHE,
+            Xm=np.array(Xm, dtype=float), ym=np.array(ym, dtype=int),
+            Xb=np.array(Xb, dtype=float), yb=np.array(yb, dtype=int),
         )
-        sys.exit(1)
-    # skip_features=False: always re-extract and update cache
-    if not skip_features:
+
+        return train(
+            malware_dir=malware_dir,
+            benign_dir=benign_dir,
+            output=output,
+            n_estimators=estimators,
+            max_files=20000,
+            use_gpu=use_gpu,
+            feature_cache=FEATURES_CACHE,  # freshly written above
+        )
+    else:
+        # Full re-extraction of both classes; save split caches afterward
         m_count = len(list(malware_dir.iterdir()))
         b_count = len(list(benign_dir.iterdir()))
-        log.info("Extracting features: %d malware + %d benign files", m_count, b_count)
+        log.info("Full feature extraction: %d malware + %d benign files", m_count, b_count)
 
-    return train(
-        malware_dir=malware_dir,
-        benign_dir=benign_dir,
-        output=output,
-        n_estimators=estimators,
-        max_files=20000,
-        use_gpu=use_gpu,
-        feature_cache=cache,
-    )
+        result = train(
+            malware_dir=malware_dir,
+            benign_dir=benign_dir,
+            output=output,
+            n_estimators=estimators,
+            max_files=20000,
+            use_gpu=use_gpu,
+            feature_cache=FEATURES_CACHE,
+        )
+
+        # Also save separate benign cache for future --skip-features runs
+        if FEATURES_CACHE.exists():
+            fd = np.load(FEATURES_CACHE)
+            np.savez_compressed(BENIGN_CACHE, Xb=fd["Xb"], yb=fd["yb"])
+            log.info("Benign cache saved → %s", BENIGN_CACHE)
+
+        return result
 
 
 # ── Upload to server ──────────────────────────────────────────────────────────
