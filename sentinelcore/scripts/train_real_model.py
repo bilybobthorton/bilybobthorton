@@ -588,15 +588,28 @@ def run_training(
             log.info("Loaded %d benign features from combined cache.", len(Xb))
 
         # Always re-extract malware so new downloads are included
-        m_files = [f for f in malware_dir.rglob("*") if f.is_file()]
-        log.info("Extracting features from %d malware files (skipping benign re-extraction)...", len(m_files))
+        # Skip files > 50 MB — oversized samples stall the PE parser and aren't useful
+        MAX_SIZE = 50 * 1024 * 1024
+        m_files = [
+            f for f in malware_dir.rglob("*")
+            if f.is_file() and f.stat().st_size <= MAX_SIZE
+        ]
+        skipped_large = sum(
+            1 for f in malware_dir.rglob("*")
+            if f.is_file() and f.stat().st_size > MAX_SIZE
+        )
+        log.info(
+            "Extracting features from %d malware files (skipping %d oversized, benign from cache)...",
+            len(m_files), skipped_large,
+        )
 
-        from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+        from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac, TimeoutError as _TE
         import os as _os
 
         workers = min(32, _os.cpu_count() or 4)
         Xm, ym = [], []
         done = 0
+        timed_out = 0
 
         def _feat(fp):
             try:
@@ -608,12 +621,18 @@ def run_training(
             futs = {pool.submit(_feat, f): f for f in m_files}
             for fut in _ac(futs):
                 done += 1
-                r = fut.result()
+                try:
+                    r = fut.result(timeout=45)  # 45s per file max — skip hung/malformed PEs
+                except _TE:
+                    timed_out += 1
+                    r = None
+                except Exception:
+                    r = None
                 if r is not None:
                     Xm.append(r)
                     ym.append(1)
-                if done % 500 == 0:
-                    log.info("  %d / %d malware features extracted", done, len(m_files))
+                if done % 100 == 0:
+                    log.info("  %d / %d extracted  (ok=%d  timeout=%d)", done, len(m_files), len(Xm), timed_out)
 
         log.info("Malware feature extraction complete: %d / %d succeeded.", len(Xm), len(m_files))
 
