@@ -65,9 +65,7 @@ jobs:
           ruff check api/ engine/ --ignore E501
 
       - name: Run Alembic migrations
-        run: |
-          cd ..
-          alembic -c sentinelcore/alembic.ini upgrade head
+        run: alembic upgrade head
 
       - name: Run tests
         run: |

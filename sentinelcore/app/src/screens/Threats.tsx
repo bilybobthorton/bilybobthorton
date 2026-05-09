@@ -111,7 +111,7 @@ export default function Threats() {
 
       {!loading && filtered.length > 0 && (
         <div className="card-list">
-          {filtered.map((alert, i) => (
+          {filtered.map((alert) => (
             <div
               key={alert.id}
               className="card-list-row"
