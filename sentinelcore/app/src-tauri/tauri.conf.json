@@ -22,12 +22,6 @@
         "visible": true
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/tray-icon.png",
-      "iconAsTemplate": false,
-      "menuOnLeftClick": false,
-      "title": "RedGuard"
-    },
     "security": {
       "csp": null
     }

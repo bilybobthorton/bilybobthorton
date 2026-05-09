@@ -298,12 +298,51 @@ pub fn cancel_scan() {
 }
 
 /// scan_mode: "quick" (default) or "full"
+///
+/// Runs the blocking scan on a dedicated thread and forwards progress events
+/// through an async channel so the webview event loop stays unblocked on Windows.
 #[tauri::command]
-pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<Vec<SystemThreat>, String> {
+pub async fn scan_system(
+    window: tauri::Window,
+    scan_mode: Option<String>,
+) -> Result<Vec<SystemThreat>, String> {
     if scan_flag().swap(true, Ordering::Relaxed) {
         return Err("Scan already running".into());
     }
 
+    let (progress_tx, mut progress_rx) =
+        tokio::sync::mpsc::unbounded_channel::<ScanProgress>();
+    let (result_tx, result_rx) =
+        tokio::sync::oneshot::channel::<Vec<SystemThreat>>();
+
+    // Spawn the blocking scan on a dedicated OS thread so it cannot stall the
+    // async runtime, and events are delivered while the scan is in progress.
+    std::thread::spawn(move || {
+        let threats = run_scan_blocking(scan_mode, &progress_tx);
+        let _ = progress_tx.send(ScanProgress {
+            scanned: 0,
+            threats: threats.len() as u64,
+            current_file: String::new(),
+            done: true,
+            phase: "done".into(),
+        });
+        let _ = result_tx.send(threats);
+    });
+
+    // Forward every progress event to the webview while the scan runs.
+    while let Some(progress) = progress_rx.recv().await {
+        let done = progress.done;
+        window.emit("scan-progress", progress).ok();
+        if done { break; }
+    }
+
+    result_rx.await.map_err(|_| "Scan thread terminated unexpectedly".to_string())
+}
+
+fn run_scan_blocking(
+    scan_mode: Option<String>,
+    tx: &tokio::sync::mpsc::UnboundedSender<ScanProgress>,
+) -> Vec<SystemThreat> {
     let full = scan_mode.as_deref() == Some("full");
     let token = get_token().unwrap_or_default();
     let has_token = !token.is_empty();
@@ -314,25 +353,21 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
     let mut hash_api_calls: u32 = 0;
     let mut full_api_calls: u32 = 0;
 
-    // Caps — full scan gets more budget
     let max_hash_calls: u32 = if full { 500 } else { 150 };
     let max_full_calls: u32 = if full { 30 } else { 15 };
 
+    let emit = |p: ScanProgress| { tx.send(p).ok(); };
+
     'outer: for dir in scan_dirs(full) {
-        if !scan_flag().load(Ordering::Relaxed) {
-            break;
-        }
-        // Emit directory-level progress so the user sees activity immediately
-        let _ = window.emit(
-            "scan-progress",
-            ScanProgress {
-                scanned,
-                threats: threats.len() as u64,
-                current_file: format!("Searching {dir}…"),
-                done: false,
-                phase: "scanning".into(),
-            },
-        );
+        if !scan_flag().load(Ordering::Relaxed) { break; }
+
+        emit(ScanProgress {
+            scanned,
+            threats: threats.len() as u64,
+            current_file: format!("Searching {dir}…"),
+            done: false,
+            phase: "scanning".into(),
+        });
 
         let walker = WalkDir::new(&dir)
             .follow_links(false)
@@ -340,50 +375,35 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
             .into_iter();
 
         for entry in walker.filter_map(|e| e.ok()) {
-            if !scan_flag().load(Ordering::Relaxed) {
-                break 'outer;
-            }
-            if !entry.file_type().is_file() {
-                continue;
-            }
+            if !scan_flag().load(Ordering::Relaxed) { break 'outer; }
+            if !entry.file_type().is_file() { continue; }
+
             let path = entry.path();
             let ext = path
                 .extension()
                 .and_then(|e| e.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            if !SCAN_EXTENSIONS.contains(&ext.as_str()) {
-                continue;
-            }
+            if !SCAN_EXTENSIONS.contains(&ext.as_str()) { continue; }
+
             let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-            // Skip empty or very large files (>100 MB)
-            if file_size == 0 || file_size > 100 * 1024 * 1024 {
-                continue;
-            }
+            if file_size == 0 || file_size > 100 * 1024 * 1024 { continue; }
 
             scanned += 1;
             let path_str = path.to_string_lossy().to_string();
 
-            // Emit progress on every file so the counter updates in real-time
-            let _ = window.emit(
-                "scan-progress",
-                ScanProgress {
-                    scanned,
-                    threats: threats.len() as u64,
-                    current_file: path_str.clone(),
-                    done: false,
-                    phase: "scanning".into(),
-                },
-            );
+            emit(ScanProgress {
+                scanned,
+                threats: threats.len() as u64,
+                current_file: path_str.clone(),
+                done: false,
+                phase: "scanning".into(),
+            });
 
-            // Read file data (needed for hash + heuristics)
-            let Ok(data) = std::fs::read(path) else {
-                continue;
-            };
-
+            let Ok(data) = std::fs::read(path) else { continue; };
             let hash = sha256_bytes(&data);
 
-            // ── Layer 1: local blocklist (instant) ────────────────────────
+            // ── Layer 1: local blocklist ──────────────────────────────────
             if is_known_bad(&hash) {
                 threats.push(SystemThreat {
                     path: path_str,
@@ -400,7 +420,6 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
             let is_pe = PE_EXTENSIONS.contains(&ext.as_str());
             let heuristic_score = if is_pe { quick_pe_score(&data) } else { 0 };
 
-            // Flag purely on local heuristics (no API needed)
             if heuristic_score >= 7 {
                 let detail = if byte_entropy(&data) > 7.2 {
                     "Extremely high entropy (packed/encrypted) with suspicious API imports"
@@ -415,7 +434,6 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
                     score: heuristic_score as f64 / 10.0,
                     detail: detail.into(),
                 });
-                // Still try to verify via API
             }
 
             // ── Layer 3: cloud full analysis for suspicious PE files ───────
@@ -424,22 +442,18 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
                 && heuristic_score >= 3
                 && full_api_calls < max_full_calls
                 && client.is_some()
-                && file_size < 25 * 1024 * 1024  // cap upload at 25 MB
+                && file_size < 25 * 1024 * 1024
             {
-                let _ = window.emit(
-                    "scan-progress",
-                    ScanProgress {
-                        scanned,
-                        threats: threats.len() as u64,
-                        current_file: format!("Analyzing: {path_str}"),
-                        done: false,
-                        phase: "uploading".into(),
-                    },
-                );
+                emit(ScanProgress {
+                    scanned,
+                    threats: threats.len() as u64,
+                    current_file: format!("Analyzing: {path_str}"),
+                    done: false,
+                    phase: "uploading".into(),
+                });
                 full_api_calls += 1;
                 if let Some((level, score)) = api_full_scan(path, data.clone(), &token, client.as_ref().unwrap()) {
                     if level == "MALICIOUS" || level == "SUSPICIOUS" {
-                        // Remove the heuristic entry if present (replace with confirmed)
                         threats.retain(|t| t.path != path_str);
                         threats.push(SystemThreat {
                             path: path_str,
@@ -450,14 +464,13 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
                             detail: "Full cloud analysis: ML + YARA + threat intelligence".into(),
                         });
                     } else if heuristic_score >= 7 {
-                        // Cloud says clean — remove heuristic flag
                         threats.retain(|t| t.path != path_str);
                     }
                 }
                 continue;
             }
 
-            // ── Layer 4: cloud hash lookup for everything else ────────────
+            // ── Layer 4: cloud hash lookup ────────────────────────────────
             if has_token && hash_api_calls < max_hash_calls && client.is_some() {
                 hash_api_calls += 1;
                 if let Some(level) = api_hash_lookup(&hash, &token, client.as_ref().unwrap()) {
@@ -478,19 +491,7 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
     }
 
     scan_flag().store(false, Ordering::Relaxed);
-
-    let _ = window.emit(
-        "scan-progress",
-        ScanProgress {
-            scanned,
-            threats: threats.len() as u64,
-            current_file: String::new(),
-            done: true,
-            phase: "done".into(),
-        },
-    );
-
-    Ok(threats)
+    threats
 }
 
 #[tauri::command]

@@ -33,6 +33,7 @@ pub fn run() {
             // auth
             commands::auth::login,
             commands::auth::logout,
+            commands::auth::set_token,
             commands::auth::get_subscription,
             // vpn
             commands::vpn::get_vpn_keys,

@@ -56,7 +56,11 @@ export default function App() {
         const token = await store.get<string>("token");
         const email = await store.get<string>("email");
         const tier  = await store.get<string>("tier");
-        if (token && email) setAuth({ token, email, tier: tier ?? "free" });
+        if (token && email) {
+          // Restore token into Rust memory so commands work without re-login
+          await invoke("set_token", { token });
+          setAuth({ token, email, tier: tier ?? "free" });
+        }
       } catch {
         // First launch.
       } finally {

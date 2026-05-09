@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Wifi, WifiOff, Server, ShieldCheck } from "lucide-react";
 
 interface VpnStatus {
@@ -14,6 +15,7 @@ const SERVERS = [
 export default function VPN() {
   const [status, setStatus]         = useState<VpnStatus>({ connected: false, server: null });
   const [loading, setLoading]       = useState(false);
+  const [phase, setPhase]           = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
   const [trialExpired, setTrialExpired] = useState(false);
 
@@ -23,10 +25,18 @@ export default function VPN() {
       .catch((e) => console.warn("VPN status:", e));
   }, []);
 
+  useEffect(() => {
+    const unlisten = listen<{ phase: string; message: string }>("vpn-phase", (e) => {
+      setPhase(e.payload.message);
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, []);
+
   const handleConnect = async () => {
     setError(null);
     setTrialExpired(false);
     setLoading(true);
+    setPhase(null);
     try {
       await invoke("connect_vpn");
       setStatus({ connected: true, server: "US East — New York" });
@@ -39,6 +49,7 @@ export default function VPN() {
       }
     } finally {
       setLoading(false);
+      setPhase(null);
     }
   };
 
@@ -110,7 +121,7 @@ export default function VPN() {
             }}
           >
             {loading
-              ? (status.connected ? "Disconnecting…" : "Connecting…")
+              ? (status.connected ? "Disconnecting…" : (phase ?? "Connecting…"))
               : (status.connected ? "Connected" : "Disconnected")}
           </div>
           <div style={{ fontSize: 12.5, color: "var(--text-3)" }}>
@@ -128,7 +139,7 @@ export default function VPN() {
           style={{ minWidth: 120, justifyContent: "center", fontSize: 14, padding: "11px 24px" }}
         >
           {loading
-            ? (status.connected ? "Disconnecting…" : "Connecting…")
+            ? (status.connected ? "Disconnecting…" : "Setting up…")
             : (status.connected ? "Disconnect" : "Connect")}
         </button>
       </div>
@@ -238,7 +249,7 @@ export default function VPN() {
           lineHeight: 1.5,
         }}
       >
-        RedGuard VPN auto-provisions your WireGuard device on first connect. WireGuard must be installed on your PC.
+        RedGuard VPN automatically sets up everything needed on first connect — no manual steps required.
       </div>
     </div>
   );

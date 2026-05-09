@@ -85,6 +85,15 @@ pub fn login(email: String, password: String) -> Result<LoginResponse, String> {
     })
 }
 
+/// Called by the frontend on startup to restore a persisted session into Rust memory.
+#[tauri::command]
+pub fn set_token(token: String) -> Result<(), String> {
+    *TOKEN
+        .lock()
+        .map_err(|e| format!("Token lock poisoned: {e}"))? = Some(token);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn logout() -> Result<(), String> {
     *TOKEN
