@@ -19,9 +19,13 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        // System tray
+        // System tray + real-time protection engine
         .setup(|app| {
             build_tray(app)?;
+            commands::realtime::init_watcher_storage();
+            // Enable protection immediately and launch the background watcher
+            commands::realtime::enable_realtime_protection();
+            commands::realtime::start_watcher(app.handle().clone());
             Ok(())
         })
         // Register all Tauri commands
@@ -47,6 +51,13 @@ pub fn run() {
             // updater
             commands::updater::check_for_update,
             commands::updater::open_browser_url,
+            // real-time protection
+            commands::realtime::enable_realtime_protection,
+            commands::realtime::disable_realtime_protection,
+            commands::realtime::get_protection_status,
+            commands::realtime::get_quarantine,
+            commands::realtime::restore_quarantine_file,
+            commands::realtime::delete_quarantine_file,
             // tray / window
             commands::tray::update_tray_status,
             commands::tray::show_window,
