@@ -603,13 +603,18 @@ def run_training(
             len(m_files), skipped_large,
         )
 
-        from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac, TimeoutError as _TE
+        from concurrent.futures import ThreadPoolExecutor as _TPE, wait as _wait, FIRST_COMPLETED as _FC
         import os as _os
+        import threading as _threading
+        import time as _time
 
-        workers = min(32, _os.cpu_count() or 4)
+        workers = min(16, _os.cpu_count() or 4)
         Xm, ym = [], []
-        done = 0
-        timed_out = 0
+        _done = [0]
+        _ok   = [0]
+        _skip = [0]
+        _lock = _threading.Lock()
+        total = len(m_files)
 
         def _feat(fp):
             try:
@@ -617,24 +622,58 @@ def run_training(
             except Exception:
                 return None
 
-        with _TPE(max_workers=workers) as pool:
-            futs = {pool.submit(_feat, f): f for f in m_files}
-            for fut in _ac(futs):
-                done += 1
-                try:
-                    r = fut.result(timeout=45)  # 45s per file max — skip hung/malformed PEs
-                except _TE:
-                    timed_out += 1
-                    r = None
-                except Exception:
-                    r = None
-                if r is not None:
-                    Xm.append(r)
-                    ym.append(1)
-                if done % 100 == 0:
-                    log.info("  %d / %d extracted  (ok=%d  timeout=%d)", done, len(m_files), len(Xm), timed_out)
+        # Live progress bar on a single updating line
+        _stop = _threading.Event()
+        def _progress():
+            while not _stop.wait(1.5):
+                with _lock:
+                    d, o, s = _done[0], _ok[0], _skip[0]
+                filled = int(d / total * 35) if total else 0
+                bar = "#" * filled + "-" * (35 - filled)
+                print(f"\r  [{bar}] {d}/{total}  ok={o}  skip={s}  ", end="", flush=True)
+        _pt = _threading.Thread(target=_progress, daemon=True)
+        _pt.start()
 
-        log.info("Malware feature extraction complete: %d / %d succeeded.", len(Xm), len(m_files))
+        with _TPE(max_workers=workers) as pool:
+            submit_time: dict = {}
+            active: set = set()
+            abandoned: set = set()
+
+            for f in m_files:
+                fut = pool.submit(_feat, f)
+                active.add(fut)
+                submit_time[fut] = _time.monotonic()
+
+            while active - abandoned:
+                watching = list(active - abandoned)
+                done_futs, _ = _wait(watching, timeout=5, return_when=_FC)
+
+                # Abandon futures stuck longer than 45s (malformed PE hangs)
+                now = _time.monotonic()
+                for fut in list(active - abandoned):
+                    if fut not in done_futs and now - submit_time.get(fut, now) > 45:
+                        abandoned.add(fut)
+                        with _lock:
+                            _done[0] += 1
+                            _skip[0] += 1
+
+                for fut in done_futs:
+                    active.discard(fut)
+                    with _lock:
+                        _done[0] += 1
+                    try:
+                        r = fut.result()
+                    except Exception:
+                        r = None
+                    if r is not None:
+                        with _lock:
+                            _ok[0] += 1
+                        Xm.append(r)
+                        ym.append(1)
+
+        _stop.set()
+        print(f"\r  [{'#' * 35}] {total}/{total}  ok={_ok[0]}  skip={_skip[0]}  ")
+        log.info("Malware feature extraction complete: %d / %d succeeded.", _ok[0], total)
 
         # Save updated malware cache + combined cache
         SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
