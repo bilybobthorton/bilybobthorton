@@ -44,6 +44,9 @@ pub fn run() {
             // vulnerabilities
             commands::vuln::get_installed_software,
             commands::vuln::scan_vulnerabilities,
+            // updater
+            commands::updater::check_for_update,
+            commands::updater::open_browser_url,
             // tray / window
             commands::tray::update_tray_status,
             commands::tray::show_window,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import NavBar from "./components/NavBar";
 import Login from "./screens/Login";
 import Home from "./screens/Home";
@@ -9,6 +10,12 @@ import Threats from "./screens/Threats";
 import Settings from "./screens/Settings";
 import Scan from "./screens/Scan";
 import Vulnerabilities from "./screens/Vulnerabilities";
+
+interface UpdateInfo {
+  version: string;
+  release_notes: string;
+  download_url: string;
+}
 
 export type Screen = "home" | "vpn" | "threats" | "scan" | "vulnerabilities" | "settings";
 
@@ -24,6 +31,23 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [screen, setScreen] = useState<Screen>("home");
   const [loading, setLoading] = useState(true);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+
+  // Check for app updates ~10s after launch (let the UI settle first).
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const current = await getVersion();
+        const info = await invoke<UpdateInfo | null>("check_for_update", {
+          currentVersion: current,
+        });
+        if (info) setUpdate(info);
+      } catch {
+        // Non-critical — silently ignore network errors.
+      }
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Restore session from persisted store on mount.
   useEffect(() => {
@@ -105,6 +129,64 @@ export default function App() {
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
+      {/* Update available banner */}
+      {update && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 20,
+            right: 20,
+            zIndex: 1000,
+            background: "#1e1e2e",
+            border: "1px solid #dc2626",
+            borderRadius: 10,
+            padding: "16px 20px",
+            width: 300,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
+            Update Available — v{update.version}
+          </div>
+          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
+            {update.release_notes}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() =>
+                invoke("open_browser_url", { url: update.download_url })
+              }
+              style={{
+                flex: 1,
+                padding: "8px 0",
+                borderRadius: 6,
+                border: "none",
+                background: "#dc2626",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Download
+            </button>
+            <button
+              onClick={() => setUpdate(null)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                border: "1px solid #334155",
+                background: "transparent",
+                color: "#64748b",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
+              Later
+            </button>
+          </div>
+        </div>
+      )}
       <NavBar
         screen={screen}
         onNavigate={setScreen}
