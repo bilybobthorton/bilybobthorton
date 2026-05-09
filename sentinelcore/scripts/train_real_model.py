@@ -36,6 +36,24 @@ _repo_root = Path(__file__).parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
+
+# ── Module-level subprocess worker (must be picklable on Windows) ─────────────
+
+def _subprocess_worker(fp_str: str, conn):
+    """
+    Runs in a child process. Sends feature vector (or None) through a Pipe.
+    Module-level so it survives Windows multiprocessing 'spawn' pickling.
+    """
+    try:
+        from pathlib import Path as _P
+        from engine.ml.features import extract_features
+        from engine.static.analyzer import analyze_file
+        conn.send(extract_features(analyze_file(_P(fp_str))))
+    except Exception:
+        conn.send(None)
+    finally:
+        conn.close()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -603,77 +621,71 @@ def run_training(
             len(m_files), skipped_large,
         )
 
-        from concurrent.futures import ThreadPoolExecutor as _TPE, wait as _wait, FIRST_COMPLETED as _FC
-        import os as _os
+        import multiprocessing as _mp
         import threading as _threading
-        import time as _time
+        import os as _os
 
+        # Use subprocesses so hung analyses can be hard-killed (threads can't be killed)
+        TIMEOUT_S = 30
         workers = min(16, _os.cpu_count() or 4)
         Xm, ym = [], []
-        _done = [0]
-        _ok   = [0]
-        _skip = [0]
-        _lock = _threading.Lock()
         total = len(m_files)
 
-        def _feat(fp):
-            try:
-                return extract_features(analyze_file(fp))
-            except Exception:
-                return None
+        def _feat_safe(fp: Path):
+            """Analyze one file in a child process; terminate it if it hangs."""
+            parent, child = _mp.Pipe(duplex=False)
+            p = _mp.Process(target=_subprocess_worker, args=(str(fp), child))
+            p.start()
+            child.close()
+            result = None
+            if parent.poll(TIMEOUT_S):
+                try:
+                    result = parent.recv()
+                except Exception:
+                    pass
+            p.terminate()
+            p.join(timeout=3)
+            if p.is_alive():
+                p.kill()
+                p.join()
+            parent.close()
+            return result
 
-        # Live progress bar on a single updating line
+        # Live single-line progress bar driven by a background thread
+        _done = [0]; _ok = [0]; _skip = [0]
+        _lock = _threading.Lock()
         _stop = _threading.Event()
-        def _progress():
+
+        def _show():
             while not _stop.wait(1.5):
                 with _lock:
                     d, o, s = _done[0], _ok[0], _skip[0]
                 filled = int(d / total * 35) if total else 0
                 bar = "#" * filled + "-" * (35 - filled)
                 print(f"\r  [{bar}] {d}/{total}  ok={o}  skip={s}  ", end="", flush=True)
-        _pt = _threading.Thread(target=_progress, daemon=True)
+
+        _pt = _threading.Thread(target=_show, daemon=True)
         _pt.start()
 
-        with _TPE(max_workers=workers) as pool:
-            submit_time: dict = {}
-            active: set = set()
-            abandoned: set = set()
-
-            for f in m_files:
-                fut = pool.submit(_feat, f)
-                active.add(fut)
-                submit_time[fut] = _time.monotonic()
-
-            while active - abandoned:
-                watching = list(active - abandoned)
-                done_futs, _ = _wait(watching, timeout=5, return_when=_FC)
-
-                # Abandon futures stuck longer than 45s (malformed PE hangs)
-                now = _time.monotonic()
-                for fut in list(active - abandoned):
-                    if fut not in done_futs and now - submit_time.get(fut, now) > 45:
-                        abandoned.add(fut)
-                        with _lock:
-                            _done[0] += 1
-                            _skip[0] += 1
-
-                for fut in done_futs:
-                    active.discard(fut)
-                    with _lock:
-                        _done[0] += 1
-                    try:
-                        r = fut.result()
-                    except Exception:
-                        r = None
+        # ThreadPoolExecutor runs _feat_safe concurrently; each call blocks for at
+        # most TIMEOUT_S seconds before the subprocess is killed and None is returned.
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {pool.submit(_feat_safe, f): f for f in m_files}
+            for fut in as_completed(futs):
+                r = fut.result()
+                with _lock:
+                    _done[0] += 1
                     if r is not None:
-                        with _lock:
-                            _ok[0] += 1
-                        Xm.append(r)
-                        ym.append(1)
+                        _ok[0] += 1
+                    else:
+                        _skip[0] += 1
+                if r is not None:
+                    Xm.append(r)
+                    ym.append(1)
 
         _stop.set()
-        print(f"\r  [{'#' * 35}] {total}/{total}  ok={_ok[0]}  skip={_skip[0]}  ")
-        log.info("Malware feature extraction complete: %d / %d succeeded.", _ok[0], total)
+        print(f"\r  [{'#'*35}] {total}/{total}  ok={_ok[0]}  skip={_skip[0]}  ")
+        log.info("Malware feature extraction complete: %d / %d.", _ok[0], total)
 
         # Save updated malware cache + combined cache
         SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
