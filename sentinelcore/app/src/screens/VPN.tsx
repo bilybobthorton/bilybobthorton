@@ -7,11 +7,6 @@ interface VpnStatus {
   server: string | null;
 }
 
-interface VpnDevice {
-  id: number;
-  name: string;
-}
-
 const SERVERS = [
   {
     id: "us-east",
@@ -26,19 +21,14 @@ export default function VPN() {
     connected: false,
     server: null,
   });
-  const [devices, setDevices] = useState<VpnDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [trialExpired, setTrialExpired] = useState(false);
 
   const loadStatus = async () => {
     try {
-      const [s, d] = await Promise.all([
-        invoke<VpnStatus>("get_vpn_status"),
-        invoke<VpnDevice[]>("get_vpn_keys"),
-      ]);
+      const s = await invoke<VpnStatus>("get_vpn_status");
       setStatus(s);
-      setDevices(d);
     } catch (e) {
       console.warn("Failed to load VPN status:", e);
     }
