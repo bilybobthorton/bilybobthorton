@@ -8,7 +8,7 @@ const TUNNEL_NAME: &str = "redguard";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VpnDevice {
-    pub id: i32,
+    pub id: String,
     pub name: String,
 }
 
@@ -46,7 +46,7 @@ fn build_client() -> Result<reqwest::blocking::Client, String> {
 fn get_or_create_device(
     client: &reqwest::blocking::Client,
     token: &str,
-) -> Result<i32, String> {
+) -> Result<String, String> {
     let resp = client
         .get(format!("{API_BASE}/api/v1/vpn/keys"))
         .bearer_auth(token)
@@ -63,8 +63,8 @@ fn get_or_create_device(
             .cloned()
             .unwrap_or_default();
         if let Some(first) = arr.first() {
-            if let Some(id) = first.get("id").and_then(|v| v.as_i64()) {
-                return Ok(id as i32);
+            if let Some(id) = first.get("id").and_then(|v| v.as_str()) {
+                return Ok(id.to_string());
             }
         }
     }
@@ -87,8 +87,8 @@ fn get_or_create_device(
         .json()
         .map_err(|e| format!("Parse error: {e}"))?;
     raw.get("id")
-        .and_then(|v| v.as_i64())
-        .map(|id| id as i32)
+        .and_then(|v| v.as_str())
+        .map(|id| id.to_string())
         .ok_or_else(|| "Missing device ID in create response".to_string())
 }
 
@@ -123,7 +123,7 @@ pub fn get_vpn_keys() -> Result<Vec<VpnDevice>, String> {
     let devices: Vec<VpnDevice> = arr
         .iter()
         .filter_map(|v| {
-            let id = v.get("id").and_then(|x| x.as_i64())? as i32;
+            let id = v.get("id").and_then(|x| x.as_str())?.to_string();
             let name = v
                 .get("name")
                 .and_then(|x| x.as_str())
