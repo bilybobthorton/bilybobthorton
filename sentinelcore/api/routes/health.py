@@ -3,7 +3,7 @@ from fastapi import APIRouter
 router = APIRouter(tags=["health"])
 
 # Bump this when a new desktop app build is released
-APP_VERSION = "0.1.5"
+APP_VERSION = "0.1.6"
 DOWNLOAD_URL = "https://dashboard.redgaurd.com/files/RedGuard_Setup.exe"
 
 
