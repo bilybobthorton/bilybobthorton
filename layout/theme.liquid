@@ -18,30 +18,29 @@
 </head>
 <body>
 
-  {%- assign app_url = 'https://app.redgaurd.com' -%}
+  {%- assign app_url = 'https://dashboard.redgaurd.com' -%}
 
   <header class="site-header" id="site-header">
     <div class="container header-inner">
       <a href="{{ routes.root_url }}" class="logo">
-        <svg class="logo-hex" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L21.5 7.5V16.5L12 22L2.5 16.5V7.5L12 2Z" stroke="#6366f1" stroke-width="1.5" fill="none"/>
-          <path d="M12 6L17.5 9.25V15.75L12 19L6.5 15.75V9.25L12 6Z" fill="#6366f1" opacity="0.3"/>
-          <circle cx="12" cy="12" r="2.5" fill="#6366f1"/>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="24" height="24" rx="6" fill="#dc2626"/>
+          <path d="M12 4.5L19 7.5V13c0 3.5-2.8 6.5-7 7.5C7.8 19.5 5 16.5 5 13V7.5L12 4.5Z" fill="white" opacity="0.15"/>
+          <path d="M9 12.75L11.25 15 15 9.75" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="logo-text">RedGuard</span>
       </a>
 
       <nav class="site-nav" id="site-nav">
         <a href="#features" class="nav-link">Features</a>
-        <a href="#detection" class="nav-link">Detection</a>
         <a href="#pricing" class="nav-link">Pricing</a>
         <a href="#vpn" class="nav-link">VPN</a>
-        <a href="{{ app_url }}/api-docs" class="nav-link" target="_blank" rel="noopener">API Docs</a>
+        <a href="{{ app_url }}/download" class="nav-link">Download</a>
       </nav>
 
       <div class="header-actions">
         <a href="{{ app_url }}/login" class="btn btn-ghost">Log in</a>
-        <a href="{{ app_url }}/register" class="btn btn-primary">Get started</a>
+        <a href="{{ app_url }}/register" class="btn btn-primary">Start free</a>
       </div>
 
       <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu" aria-expanded="false">
