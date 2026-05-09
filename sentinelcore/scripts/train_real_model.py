@@ -39,12 +39,16 @@ if str(_repo_root) not in sys.path:
 
 # ── Module-level subprocess worker (must be picklable on Windows) ─────────────
 
-def _subprocess_worker(fp_str: str, conn):
+def _subprocess_worker(fp_str: str, conn, repo_root: str):
     """
     Runs in a child process. Sends feature vector (or None) through a Pipe.
     Module-level so it survives Windows multiprocessing 'spawn' pickling.
+    repo_root is passed explicitly because sys.path is not inherited on Windows spawn.
     """
     try:
+        import sys as _sys
+        if repo_root not in _sys.path:
+            _sys.path.insert(0, repo_root)
         from pathlib import Path as _P
         from engine.ml.features import extract_features
         from engine.static.analyzer import analyze_file
@@ -631,10 +635,12 @@ def run_training(
         Xm, ym = [], []
         total = len(m_files)
 
+        _repo_root_str = str(_repo_root)
+
         def _feat_safe(fp: Path):
             """Analyze one file in a child process; terminate it if it hangs."""
             parent, child = _mp.Pipe(duplex=False)
-            p = _mp.Process(target=_subprocess_worker, args=(str(fp), child))
+            p = _mp.Process(target=_subprocess_worker, args=(str(fp), child, _repo_root_str))
             p.start()
             child.close()
             result = None
@@ -835,4 +841,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # Required on Windows: prevents spawned child processes from re-running main()
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()
