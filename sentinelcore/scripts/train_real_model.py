@@ -124,62 +124,79 @@ def _extract_pe_from_zip_bytes(raw: bytes, dest_dir: Path, seen: set, prefix: st
     return count
 
 
-def _download_mb_daily_feeds(days_back: int = 30) -> int:
+def _download_mb_daily_feeds(days_back: int = 30, parallel: int = 8) -> int:
     """
-    Download MalwareBazaar daily batch ZIPs — NO authentication required, no rate limit.
+    Download MalwareBazaar daily batch ZIPs in parallel — NO auth, NO rate limit.
     Each daily ZIP contains every sample submitted that day, password 'infected'.
     Returns total new PE files written to MALWARE_DIR.
     """
     import requests
+    import threading
     from datetime import date, timedelta
 
     MALWARE_DIR.mkdir(parents=True, exist_ok=True)
     seen: set[str] = {f.name for f in MALWARE_DIR.iterdir()}
+    seen_lock = threading.Lock()
     total_new = 0
+    total_lock = threading.Lock()
 
-    log.info("Downloading MalwareBazaar daily feeds (last %d days, no auth required)...", days_back)
+    log.info(
+        "Downloading MalwareBazaar daily feeds (last %d days, %d parallel, no auth)...",
+        days_back, parallel,
+    )
     today = date.today()
+    days = [today - timedelta(days=d) for d in range(1, days_back + 1)]
 
-    for delta in range(1, days_back + 1):
-        day = today - timedelta(days=delta)
+    def _fetch_day(day) -> int:
         day_str = day.strftime("%Y-%m-%d")
         url = f"{MB_DAILY_FEED}{day_str}.zip"
         try:
-            log.info("  Fetching daily feed: %s", day_str)
-            r = requests.get(url, timeout=300, stream=True)
+            r = requests.get(url, timeout=300)
             if r.status_code == 404:
-                log.debug("  %s not available yet, skipping", day_str)
-                continue
+                return 0
             r.raise_for_status()
             raw = r.content
-            new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=day_str)
-            total_new += new
-            log.info("  %s → %d new PE samples (running total: %d)", day_str, new, total_new)
+            # Thread-safe extraction: lock around seen set + disk writes
+            with seen_lock:
+                new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=day_str)
+            log.info("  %s → %d PE samples", day_str, new)
+            return new
         except Exception as e:
             log.warning("  Daily feed %s failed: %s", day_str, e)
-            continue
+            return 0
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        futures = {pool.submit(_fetch_day, d): d for d in days}
+        done = 0
+        for fut in as_completed(futures):
+            n = fut.result()
+            with total_lock:
+                total_new += n
+            done += 1
+            log.info("  Progress: %d / %d days done — %d PE samples total", done, len(days), total_new)
 
     return total_new
 
 
-def _download_mb_hourly_feeds(hours_back: int = 24) -> int:
+def _download_mb_hourly_feeds(hours_back: int = 24, parallel: int = 6) -> int:
     """
-    Download MalwareBazaar hourly batch ZIPs — NO authentication required.
-    Useful for getting samples from the current day before the daily ZIP is published.
+    Download MalwareBazaar hourly batch ZIPs in parallel — NO auth required.
+    Fills in same-day samples before the daily ZIP is published.
     """
     import requests
+    import threading
     from datetime import datetime, timedelta, timezone
 
     MALWARE_DIR.mkdir(parents=True, exist_ok=True)
     seen: set[str] = {f.name for f in MALWARE_DIR.iterdir()}
+    seen_lock = threading.Lock()
     total_new = 0
 
-    log.info("Downloading MalwareBazaar hourly feeds (last %d hours)...", hours_back)
+    log.info("Downloading MalwareBazaar hourly feeds (last %d hours, %d parallel)...", hours_back, parallel)
     now = datetime.now(timezone.utc)
+    hours = [now - timedelta(hours=h) for h in range(1, hours_back + 1)]
 
-    for h in range(1, hours_back + 1):
-        ts = now - timedelta(hours=h)
-        # Try common filename formats abuse.ch uses for hourly zips
+    def _fetch_hour(ts) -> int:
         for fmt in [
             ts.strftime("%Y-%m-%d_%H-00-00.zip"),
             ts.strftime("%Y-%m-%dT%H:00:00.zip"),
@@ -187,19 +204,24 @@ def _download_mb_hourly_feeds(hours_back: int = 24) -> int:
         ]:
             url = f"{MB_HOURLY_FEED}{fmt}"
             try:
-                r = requests.get(url, timeout=120, stream=True)
+                r = requests.get(url, timeout=120)
                 if r.status_code == 404:
                     continue
                 r.raise_for_status()
-                raw = r.content
                 prefix = ts.strftime("h%Y%m%d%H")
-                new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=prefix)
-                total_new += new
+                with seen_lock:
+                    new = _extract_pe_from_zip_bytes(r.content, MALWARE_DIR, seen, prefix=prefix)
                 if new:
-                    log.info("  Hourly %s → %d new PE samples", fmt, new)
-                break
+                    log.info("  Hourly %s → %d PE samples", fmt, new)
+                return new
             except Exception:
                 continue
+        return 0
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        total_new = sum(fut.result() for fut in as_completed(
+            pool.submit(_fetch_hour, ts) for ts in hours
+        ))
 
     return total_new
 
