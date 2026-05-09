@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Wifi, WifiOff, Server } from "lucide-react";
+import { Wifi, WifiOff, Server, ShieldCheck } from "lucide-react";
 
 interface VpnStatus {
   connected: boolean;
@@ -8,34 +8,19 @@ interface VpnStatus {
 }
 
 const SERVERS = [
-  {
-    id: "us-east",
-    label: "US East — New York",
-    location: "New York, USA",
-    flag: "🇺🇸",
-  },
+  { id: "us-east", label: "US East — New York", location: "New York, USA", flag: "🇺🇸" },
 ];
 
 export default function VPN() {
-  const [status, setStatus] = useState<VpnStatus>({
-    connected: false,
-    server: null,
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus]         = useState<VpnStatus>({ connected: false, server: null });
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
   const [trialExpired, setTrialExpired] = useState(false);
 
-  const loadStatus = async () => {
-    try {
-      const s = await invoke<VpnStatus>("get_vpn_status");
-      setStatus(s);
-    } catch (e) {
-      console.warn("Failed to load VPN status:", e);
-    }
-  };
-
   useEffect(() => {
-    loadStatus();
+    invoke<VpnStatus>("get_vpn_status")
+      .then(setStatus)
+      .catch((e) => console.warn("VPN status:", e));
   }, []);
 
   const handleConnect = async () => {
@@ -71,245 +56,172 @@ export default function VPN() {
   };
 
   return (
-    <div style={{ padding: "28px 32px", overflowY: "auto", height: "100%" }}>
-      <h2
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          color: "#f1f5f9",
-          marginBottom: 24,
-          letterSpacing: "-0.02em",
-        }}
-      >
-        VPN
-      </h2>
+    <div className="screen">
+      <div className="screen-header">
+        <h2 className="screen-title">VPN</h2>
+        {status.connected && (
+          <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--green)" }}>
+            <span className="live-dot green" />
+            Tunnel active
+          </div>
+        )}
+      </div>
 
-      {/* Status banner */}
-      <div
-        style={{
-          background: status.connected ? "#14532d" : "#0d0d14",
-          border: `1px solid ${status.connected ? "#166534" : "#1e1e2e"}`,
-          borderRadius: 12,
-          padding: "24px",
-          display: "flex",
-          alignItems: "center",
-          gap: 20,
-          marginBottom: 24,
-        }}
-      >
+      {/* Connection hero */}
+      <div className={`vpn-hero${status.connected ? " connected" : " disconnected"}`}>
+        {/* Icon with pulse */}
         <div
           style={{
-            width: 52,
-            height: 52,
+            width: 64,
+            height: 64,
             borderRadius: "50%",
-            background: status.connected ? "#166534" : "#1e1e2e",
+            background: status.connected ? "var(--green-12)" : "var(--raised)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            boxShadow: status.connected ? "0 0 20px #22c55e30" : "none",
+            position: "relative",
+            boxShadow: status.connected ? "0 0 28px var(--green-glow)" : "none",
+            transition: "all 0.3s ease",
           }}
         >
+          {status.connected && (
+            <>
+              <div className="pulse-ring green" />
+              <div className="pulse-ring green delay" />
+            </>
+          )}
           {status.connected ? (
-            <Wifi size={24} color="#22c55e" />
+            <Wifi size={26} color="var(--green)" />
           ) : (
-            <WifiOff size={24} color="#64748b" />
+            <WifiOff size={26} color="var(--text-3)" />
           )}
         </div>
+
+        {/* Status text */}
         <div style={{ flex: 1 }}>
           <div
             style={{
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: 700,
-              color: status.connected ? "#22c55e" : "#94a3b8",
-              marginBottom: 2,
+              color: status.connected ? "var(--green)" : "var(--text-2)",
+              marginBottom: 4,
+              letterSpacing: "-0.01em",
             }}
           >
-            {status.connected ? "Connected" : "Disconnected"}
+            {loading
+              ? (status.connected ? "Disconnecting…" : "Connecting…")
+              : (status.connected ? "Connected" : "Disconnected")}
           </div>
-          <div style={{ fontSize: 13, color: "#64748b" }}>
+          <div style={{ fontSize: 12.5, color: "var(--text-3)" }}>
             {status.connected
-              ? `Tunneled via ${status.server ?? "RedGuard VPN"}`
+              ? `Encrypted tunnel via ${status.server ?? "RedGuard VPN"}`
               : "Your traffic is not encrypted"}
           </div>
         </div>
 
-        {/* Connect / Disconnect button */}
+        {/* CTA button */}
         <button
           onClick={status.connected ? handleDisconnect : handleConnect}
           disabled={loading}
-          style={{
-            padding: "11px 28px",
-            background: status.connected ? "#1e1e2e" : "#dc2626",
-            color: status.connected ? "#94a3b8" : "#fff",
-            border: status.connected ? "1px solid #334155" : "none",
-            borderRadius: 8,
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: loading ? "not-allowed" : "pointer",
-            transition: "all 0.15s",
-            minWidth: 130,
-          }}
+          className={`btn ${status.connected ? "btn-secondary" : "btn-primary"}`}
+          style={{ minWidth: 120, justifyContent: "center", fontSize: 14, padding: "11px 24px" }}
         >
           {loading
-            ? status.connected
-              ? "Disconnecting…"
-              : "Connecting…"
-            : status.connected
-            ? "Disconnect"
-            : "Connect"}
+            ? (status.connected ? "Disconnecting…" : "Connecting…")
+            : (status.connected ? "Disconnect" : "Connect")}
         </button>
       </div>
 
+      {/* Trial expired */}
       {trialExpired && (
-        <div style={{
-          marginBottom: 20,
-          padding: "16px 20px",
-          background: "#1c0a0a",
-          border: "1px solid #7f1d1d",
-          borderRadius: 10,
-        }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 6 }}>
+        <div
+          style={{
+            marginBottom: 20,
+            padding: "18px 20px",
+            background: "#110707",
+            border: "1px solid rgba(239,68,68,0.2)",
+            borderRadius: "var(--r-lg)",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text-1)", marginBottom: 5 }}>
             Your VPN trial has ended
           </div>
-          <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>
-            Upgrade to RedGuard Pro or the Security Bundle to keep your VPN protection.
+          <div style={{ fontSize: 12.5, color: "var(--text-3)", marginBottom: 14 }}>
+            Upgrade to RedGuard Pro or the Security Bundle to keep VPN protection.
           </div>
           <a
             href="https://redgaurd.com"
             target="_blank"
             rel="noreferrer"
-            style={{
-              display: "inline-block",
-              padding: "9px 20px",
-              background: "#dc2626",
-              color: "#fff",
-              borderRadius: 7,
-              fontSize: 13,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
+            className="btn btn-primary"
+            style={{ textDecoration: "none", display: "inline-flex" }}
           >
             Upgrade now →
           </a>
         </div>
       )}
 
+      {/* Error */}
       {error && (
-        <div
-          style={{
-            marginBottom: 20,
-            padding: "10px 14px",
-            background: "#ef444418",
-            border: "1px solid #ef444430",
-            borderRadius: 8,
-            color: "#ef4444",
-            fontSize: 13,
-          }}
-        >
-          {error}
+        <div className="error-banner" style={{ marginBottom: 20 }}>
+          <span>{error}</span>
+          <button className="error-dismiss" onClick={() => setError(null)}>×</button>
         </div>
       )}
 
       {/* Server list */}
-      <h3
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "#64748b",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          marginBottom: 12,
-        }}
-      >
-        Available Servers
-      </h3>
+      <div className="section-label">
+        <Server size={12} /> Available Servers
+      </div>
 
-      <div
-        style={{
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          overflow: "hidden",
-          marginBottom: 24,
-        }}
-      >
-        {SERVERS.map((srv, i) => {
+      <div className="card-list" style={{ marginBottom: 20 }}>
+        {SERVERS.map((srv) => {
           const active = status.connected && status.server === srv.label;
           return (
             <div
               key={srv.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: "14px 16px",
-                borderBottom:
-                  i < SERVERS.length - 1 ? "1px solid #1e1e2e" : "none",
-                background: active ? "#14532d20" : "transparent",
-              }}
+              className="card-list-row"
+              style={{ background: active ? "var(--green-12)" : undefined }}
             >
-              <span style={{ fontSize: 22 }}>{srv.flag}</span>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: active ? "#22c55e" : "#f1f5f9",
-                  }}
-                >
+              <span style={{ fontSize: 20, marginRight: 2 }}>{srv.flag}</span>
+              <div style={{ flex: 1, paddingLeft: 4 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: active ? "var(--green)" : "var(--text-1)" }}>
                   {srv.location}
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  {srv.label}
-                </div>
+                <div style={{ fontSize: 11, color: "var(--text-3)" }}>{srv.label}</div>
               </div>
-              <Server
-                size={14}
-                color={active ? "#22c55e" : "#334155"}
-              />
-              {active && (
-                <span
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#22c55e",
-                    boxShadow: "0 0 6px #22c55e",
-                  }}
-                />
+              {active ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <ShieldCheck size={14} color="var(--green)" />
+                  <span className="live-dot green" />
+                </div>
+              ) : (
+                <Server size={14} color="var(--text-3)" />
               )}
             </div>
           );
         })}
       </div>
 
-      {/* Connection stats (placeholder) */}
+      {/* Connection stats when active */}
       {status.connected && (
         <>
-          <h3
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#64748b",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              marginBottom: 12,
-            }}
-          >
-            Connection Stats
-          </h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 12,
-              marginBottom: 24,
-            }}
-          >
-            <StatCard label="Latency" value="—" unit="ms" />
-            <StatCard label="Data Sent" value="—" unit="MB" />
-            <StatCard label="Data Received" value="—" unit="MB" />
+          <div className="section-label">Connection Stats</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20 }}>
+            {[
+              { label: "Latency", value: "—", unit: "ms" },
+              { label: "Data Sent", value: "—", unit: "MB" },
+              { label: "Data Received", value: "—", unit: "MB" },
+            ].map((s) => (
+              <div key={s.label} className="stat-card">
+                <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 2 }}>
+                  <span className="stat-value" style={{ fontSize: 18 }}>{s.value}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-3)" }}>{s.unit}</span>
+                </div>
+                <div className="stat-label">{s.label}</div>
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -318,59 +230,15 @@ export default function VPN() {
       <div
         style={{
           padding: "12px 16px",
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          color: "#475569",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--r-md)",
+          color: "var(--text-3)",
           fontSize: 12,
+          lineHeight: 1.5,
         }}
       >
-        RedGuard VPN automatically configures your device on first connect. WireGuard must be installed on your PC.
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: string | number;
-  unit: string;
-}) {
-  return (
-    <div
-      style={{
-        background: "#0d0d14",
-        border: "1px solid #1e1e2e",
-        borderRadius: 10,
-        padding: "14px",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          color: "#f1f5f9",
-          marginBottom: 2,
-        }}
-      >
-        {value}{" "}
-        <span style={{ fontSize: 12, color: "#64748b", fontWeight: 400 }}>
-          {unit}
-        </span>
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: "#475569",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
-      >
-        {label}
+        RedGuard VPN auto-provisions your WireGuard device on first connect. WireGuard must be installed on your PC.
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import { Shield, Globe, AlertTriangle, Settings, LogOut, ScanLine, ShieldAlert } from "lucide-react";
 import type { Screen } from "../App";
-import StatusBadge from "./StatusBadge";
 
 interface NavBarProps {
   screen: Screen;
@@ -16,33 +15,34 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: "home", label: "Home", icon: <Shield size={18} /> },
-  { id: "scan", label: "Scan", icon: <ScanLine size={18} /> },
-  { id: "vpn", label: "VPN", icon: <Globe size={18} /> },
-  { id: "threats", label: "Threats", icon: <AlertTriangle size={18} /> },
-  { id: "vulnerabilities", label: "Vulns", icon: <ShieldAlert size={18} /> },
-  { id: "settings", label: "Settings", icon: <Settings size={18} /> },
+const NAV_MAIN: NavItem[] = [
+  { id: "home",  label: "Home",           icon: <Shield size={17} /> },
+  { id: "scan",  label: "System Scan",    icon: <ScanLine size={17} /> },
+  { id: "vpn",   label: "VPN",            icon: <Globe size={17} /> },
+  { id: "threats",       label: "Threats",         icon: <AlertTriangle size={17} /> },
+  { id: "vulnerabilities", label: "Vulnerabilities", icon: <ShieldAlert size={17} /> },
 ];
 
-export default function NavBar({
-  screen,
-  onNavigate,
-  email,
-  tier,
-  onLogout,
-}: NavBarProps) {
+const TIER_COLORS: Record<string, string> = {
+  free:       "#64748b",
+  pro:        "#3b82f6",
+  enterprise: "#8b5cf6",
+  bundle:     "#8b5cf6",
+};
+
+export default function NavBar({ screen, onNavigate, email, tier, onLogout }: NavBarProps) {
+  const tierColor = TIER_COLORS[tier.toLowerCase()] ?? "#64748b";
+
   return (
     <nav
       style={{
-        width: 200,
-        minWidth: 200,
+        width: 212,
+        minWidth: 212,
         height: "100%",
-        background: "#0d0d14",
-        borderRight: "1px solid #1e1e2e",
+        background: "var(--surface)",
+        borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
-        padding: "0",
         userSelect: "none",
       }}
     >
@@ -52,133 +52,126 @@ export default function NavBar({
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "20px 16px 16px",
-          borderBottom: "1px solid #1e1e2e",
+          padding: "18px 16px 14px",
+          borderBottom: "1px solid var(--border-sub)",
         }}
       >
         <div
           style={{
-            width: 32,
-            height: 32,
-            background: "#dc2626",
+            width: 30,
+            height: 30,
+            background: "var(--red)",
             borderRadius: 8,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
+            boxShadow: "0 2px 10px var(--red-25)",
           }}
         >
-          <Shield size={18} color="#fff" />
+          <Shield size={16} color="#fff" />
         </div>
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: 16,
-            color: "#f1f5f9",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          RedGuard
-        </span>
-      </div>
-
-      {/* Nav items */}
-      <div style={{ flex: 1, padding: "8px 8px" }}>
-        {NAV_ITEMS.map((item) => {
-          const active = screen === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                width: "100%",
-                padding: "9px 12px",
-                borderRadius: 7,
-                border: "none",
-                background: active ? "#dc2626" : "transparent",
-                color: active ? "#fff" : "#94a3b8",
-                fontWeight: active ? 600 : 400,
-                fontSize: 14,
-                cursor: "pointer",
-                transition: "background 0.15s, color 0.15s",
-                marginBottom: 2,
-                textAlign: "left",
-              }}
-              onMouseEnter={(e) => {
-                if (!active) {
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "#1e1e2e";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#cbd5e1";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!active) {
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "transparent";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#94a3b8";
-                }
-              }}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* User info + logout */}
-      <div
-        style={{
-          borderTop: "1px solid #1e1e2e",
-          padding: "12px 8px",
-        }}
-      >
-        <div style={{ padding: "0 8px 10px" }}>
-          <div
-            style={{
-              fontSize: 12,
-              color: "#64748b",
-              marginBottom: 4,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-            title={email}
-          >
-            {email}
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text-1)", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+            RedGuard
           </div>
-          <StatusBadge label={tier} />
+          <div style={{ fontSize: 10, color: "var(--text-3)", letterSpacing: "0.04em" }}>
+            SECURITY
+          </div>
         </div>
+      </div>
+
+      {/* Main nav */}
+      <div style={{ flex: 1, padding: "10px 8px" }}>
+        <div style={{ marginBottom: 4, padding: "0 6px 6px" }}>
+          <span style={{ fontSize: 10, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
+            Protection
+          </span>
+        </div>
+        {NAV_MAIN.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onNavigate(item.id)}
+            className={`nav-item${screen === item.id ? " active" : ""}`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+
+        <div style={{ height: 1, background: "var(--border-sub)", margin: "12px 4px" }} />
+
         <button
-          onClick={onLogout}
+          onClick={() => onNavigate("settings")}
+          className={`nav-item${screen === "settings" ? " active" : ""}`}
+        >
+          <Settings size={17} />
+          Settings
+        </button>
+      </div>
+
+      {/* Footer — user + logout */}
+      <div style={{ borderTop: "1px solid var(--border-sub)", padding: "10px 10px 12px" }}>
+        <div
           style={{
+            padding: "8px 8px 10px",
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            width: "100%",
-            padding: "8px 12px",
-            borderRadius: 7,
-            border: "none",
-            background: "transparent",
-            color: "#64748b",
-            fontSize: 13,
-            cursor: "pointer",
-            transition: "background 0.15s, color 0.15s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "#1e1e2e";
-            (e.currentTarget as HTMLButtonElement).style.color = "#ef4444";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background =
-              "transparent";
-            (e.currentTarget as HTMLButtonElement).style.color = "#64748b";
+            gap: 9,
           }}
         >
-          <LogOut size={15} />
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: "var(--raised)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--text-2)",
+            }}
+          >
+            {email.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 11.5,
+                color: "var(--text-2)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                lineHeight: 1.3,
+              }}
+              title={email}
+            >
+              {email}
+            </div>
+            <span
+              style={{
+                fontSize: 9.5,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: tierColor,
+              }}
+            >
+              {tier}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={onLogout}
+          className="nav-item"
+          style={{ color: "var(--text-3)", fontSize: 12.5 }}
+        >
+          <LogOut size={14} />
           Sign out
         </button>
       </div>

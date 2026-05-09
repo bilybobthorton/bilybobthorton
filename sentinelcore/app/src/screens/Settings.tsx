@@ -1,13 +1,7 @@
 import { useState } from "react";
-import {
-  User,
-  Shield,
-  Globe,
-  Info,
-  LogOut,
-  ExternalLink,
-  RefreshCw,
-} from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
+import { User, Shield, Globe, Info, LogOut, ExternalLink, RefreshCw } from "lucide-react";
 import type { AuthState } from "../App";
 import StatusBadge from "../components/StatusBadge";
 
@@ -16,149 +10,91 @@ interface SettingsProps {
   onLogout: () => void;
 }
 
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
+interface UpdateInfo {
+  version: string;
+  release_notes: string;
+  download_url: string;
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      style={{
-        width: 40,
-        height: 22,
-        borderRadius: 11,
-        border: "none",
-        background: checked ? "#dc2626" : "#1e1e2e",
-        position: "relative",
-        cursor: "pointer",
-        transition: "background 0.2s",
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 2,
-          left: checked ? 20 : 2,
-          width: 18,
-          height: 18,
-          borderRadius: "50%",
-          background: "#fff",
-          transition: "left 0.2s",
-        }}
-      />
-    </button>
+      className={`toggle${checked ? " on" : ""}`}
+    />
   );
 }
 
-function SectionHeader({
-  icon,
-  title,
-}: {
-  icon: React.ReactNode;
-  title: string;
-}) {
+function SectionLabel({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 10,
-        marginTop: 28,
-      }}
-    >
+    <div className="section-label">
       {icon}
-      <h3
-        style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: "#64748b",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-        }}
-      >
-        {title}
-      </h3>
+      {title}
     </div>
   );
 }
 
-function SettingRow({
-  label,
-  sub,
-  right,
-}: {
-  label: string;
-  sub?: string;
-  right: React.ReactNode;
-}) {
+function SettingRow({ label, sub, right }: { label: string; sub?: string; right: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        padding: "13px 16px",
-        borderBottom: "1px solid #1e1e2e",
-      }}
-    >
+    <div className="card-list-row" style={{ cursor: "default" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: "#f1f5f9" }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: "#475569", marginTop: 1 }}>{sub}</div>}
+        <div style={{ fontSize: 13, color: "var(--text-1)" }}>{label}</div>
+        {sub && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 1 }}>{sub}</div>}
       </div>
-      <div style={{ flexShrink: 0 }}>{right}</div>
+      <div style={{ flexShrink: 0, marginLeft: 16 }}>{right}</div>
     </div>
   );
 }
 
 export default function Settings({ auth, onLogout }: SettingsProps) {
-  const [realTimeProtection, setRealTimeProtection] = useState(true);
-  const [startOnLogin, setStartOnLogin] = useState(true);
+  const [realTime,       setRealTime]       = useState(true);
+  const [startOnLogin,   setStartOnLogin]   = useState(true);
   const [autoQuarantine, setAutoQuarantine] = useState(false);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const [updateMsg, setUpdateMsg] = useState<string | null>(null);
+  const [checking,       setChecking]       = useState(false);
+  const [updateMsg,      setUpdateMsg]      = useState<string | null>(null);
+  const [update,         setUpdate]         = useState<UpdateInfo | null>(null);
 
-  const handleCheckUpdate = () => {
-    setCheckingUpdate(true);
+  const handleCheckUpdate = async () => {
+    setChecking(true);
     setUpdateMsg(null);
-    setTimeout(() => {
-      setCheckingUpdate(false);
-      setUpdateMsg("You're on the latest version (0.1.0).");
-    }, 1500);
+    setUpdate(null);
+    try {
+      const current = await getVersion();
+      const info = await invoke<UpdateInfo | null>("check_for_update", { currentVersion: current });
+      if (info) {
+        setUpdate(info);
+        setUpdateMsg(`v${info.version} available — ${info.release_notes}`);
+      } else {
+        setUpdateMsg("You're on the latest version.");
+      }
+    } catch {
+      setUpdateMsg("Could not check for updates.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const linkStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    color: "var(--red)",
+    fontSize: 12,
+    textDecoration: "none",
   };
 
   return (
-    <div style={{ padding: "28px 32px", height: "100%", overflowY: "auto" }}>
-      <h2
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          color: "#f1f5f9",
-          letterSpacing: "-0.02em",
-          marginBottom: 4,
-        }}
-      >
-        Settings
-      </h2>
-      <p style={{ fontSize: 12, color: "#475569", marginBottom: 4 }}>
-        Manage your account and preferences
-      </p>
+    <div className="screen">
+      <div style={{ marginBottom: 24 }}>
+        <h2 className="screen-title" style={{ marginBottom: 3 }}>Settings</h2>
+        <p style={{ fontSize: 12, color: "var(--text-3)" }}>Account, protection preferences, and app info</p>
+      </div>
 
       {/* Account */}
-      <SectionHeader icon={<User size={14} color="#64748b" />} title="Account" />
-      <div
-        style={{
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
+      <SectionLabel icon={<User size={12} />} title="Account" />
+      <div className="card-list">
         <SettingRow
           label="Email"
           sub={auth.email}
@@ -172,201 +108,96 @@ export default function Settings({ auth, onLogout }: SettingsProps) {
           label="Manage subscription"
           sub="Billing, invoices, and plan changes"
           right={
-            <a
-              href="https://redgaurd.com/billing"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                color: "#dc2626",
-                fontSize: 12,
-              }}
-            >
-              Open <ExternalLink size={12} />
+            <a href="https://redgaurd.com/billing" target="_blank" rel="noreferrer" style={linkStyle}>
+              Open <ExternalLink size={11} />
             </a>
           }
         />
       </div>
 
       {/* Protection */}
-      <SectionHeader
-        icon={<Shield size={14} color="#64748b" />}
-        title="Protection"
-      />
-      <div
-        style={{
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
+      <SectionLabel icon={<Shield size={12} />} title="Protection" />
+      <div className="card-list">
         <SettingRow
           label="Real-time protection"
           sub="Monitor files and processes continuously"
-          right={
-            <Toggle
-              checked={realTimeProtection}
-              onChange={setRealTimeProtection}
-            />
-          }
+          right={<Toggle checked={realTime} onChange={setRealTime} />}
         />
         <SettingRow
           label="Start on login"
           sub="Launch RedGuard automatically at startup"
-          right={
-            <Toggle checked={startOnLogin} onChange={setStartOnLogin} />
-          }
+          right={<Toggle checked={startOnLogin} onChange={setStartOnLogin} />}
         />
         <SettingRow
           label="Auto-quarantine"
           sub="Automatically isolate detected threats"
-          right={
-            <Toggle
-              checked={autoQuarantine}
-              onChange={setAutoQuarantine}
-            />
-          }
+          right={<Toggle checked={autoQuarantine} onChange={setAutoQuarantine} />}
         />
       </div>
 
       {/* VPN */}
-      <SectionHeader icon={<Globe size={14} color="#64748b" />} title="VPN" />
-      <div
-        style={{
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
+      <SectionLabel icon={<Globe size={12} />} title="VPN" />
+      <div className="card-list">
         <SettingRow
           label="Manage VPN devices"
-          sub="Add, revoke, or download device configs"
+          sub="Add, revoke, or download WireGuard configs"
           right={
-            <a
-              href="https://dashboard.redgaurd.com/vpn/keys"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                color: "#dc2626",
-                fontSize: 12,
-              }}
-            >
-              Open <ExternalLink size={12} />
+            <a href="https://dashboard.redgaurd.com/vpn/keys" target="_blank" rel="noreferrer" style={linkStyle}>
+              Open <ExternalLink size={11} />
             </a>
           }
         />
       </div>
 
       {/* About */}
-      <SectionHeader icon={<Info size={14} color="#64748b" />} title="About" />
-      <div
-        style={{
-          background: "#0d0d14",
-          border: "1px solid #1e1e2e",
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
+      <SectionLabel icon={<Info size={12} />} title="About" />
+      <div className="card-list" style={{ marginBottom: 28 }}>
         <SettingRow
-          label="Version"
+          label="App"
           sub="RedGuard Desktop"
-          right={
-            <span style={{ fontSize: 12, color: "#475569" }}>0.1.0</span>
-          }
+          right={<span style={{ fontSize: 12, color: "var(--text-3)" }}>v0.1.5</span>}
         />
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "13px 16px",
-            borderBottom: "1px solid #1e1e2e",
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, color: "#f1f5f9" }}>
-              Check for updates
+        <div className="card-list-row" style={{ cursor: "default", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <div>
+              <div style={{ fontSize: 13, color: "var(--text-1)" }}>Check for updates</div>
+              {updateMsg && (
+                <div style={{ fontSize: 11, color: update ? "var(--amber)" : "var(--green)", marginTop: 2 }}>
+                  {updateMsg}
+                </div>
+              )}
             </div>
-            {updateMsg && (
-              <div
-                style={{ fontSize: 11, color: "#22c55e", marginTop: 2 }}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {update && (
+                <a
+                  href={update.download_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary"
+                  style={{ textDecoration: "none", fontSize: 12, padding: "6px 12px" }}
+                >
+                  Download
+                </a>
+              )}
+              <button
+                onClick={handleCheckUpdate}
+                disabled={checking}
+                className="btn btn-secondary"
+                style={{ padding: "6px 12px", gap: 6, fontSize: 12 }}
               >
-                {updateMsg}
-              </div>
-            )}
+                <RefreshCw size={12} className={checking ? "spin" : ""} />
+                {checking ? "Checking…" : "Check"}
+              </button>
+            </div>
           </div>
-          <button
-            onClick={handleCheckUpdate}
-            disabled={checkingUpdate}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 14px",
-              background: "#1e1e2e",
-              border: "1px solid #334155",
-              borderRadius: 6,
-              color: "#94a3b8",
-              fontSize: 12,
-              cursor: checkingUpdate ? "not-allowed" : "pointer",
-            }}
-          >
-            <RefreshCw
-              size={13}
-              style={{
-                animation: checkingUpdate ? "spin 1s linear infinite" : "none",
-              }}
-            />
-            {checkingUpdate ? "Checking…" : "Check"}
-          </button>
         </div>
       </div>
 
-      {/* Danger zone */}
-      <div style={{ marginTop: 28 }}>
-        <button
-          onClick={onLogout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 18px",
-            background: "transparent",
-            border: "1px solid #7f1d1d",
-            borderRadius: 8,
-            color: "#ef4444",
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: "pointer",
-            transition: "background 0.15s",
-          }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLButtonElement).style.background =
-              "#ef444418")
-          }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLButtonElement).style.background =
-              "transparent")
-          }
-        >
-          <LogOut size={15} />
-          Sign out
-        </button>
-      </div>
-
-      {/* Spinner keyframe (injected inline since we're not using CSS modules) */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      {/* Sign out */}
+      <button onClick={onLogout} className="btn-danger-ghost">
+        <LogOut size={14} />
+        Sign out
+      </button>
     </div>
   );
 }

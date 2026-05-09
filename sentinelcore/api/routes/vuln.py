@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from typing import Optional
 
 import httpx
@@ -135,7 +134,7 @@ def _version_clearly_patched(cve: dict, installed_version: str) -> bool:
     (keep the CVE) when uncertain.
     """
     try:
-        from packaging.version import Version, InvalidVersion
+        from packaging.version import Version
         iv = Version(installed_version)
     except Exception:
         return False

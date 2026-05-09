@@ -15,8 +15,6 @@ import {
 import type { AuthState, Screen } from "../App";
 import StatusBadge from "../components/StatusBadge";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface ProtectionStatus {
   enabled: boolean;
   files_analyzed: number;
@@ -63,8 +61,6 @@ interface HomeProps {
   onNavigate: (s: Screen) => void;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -77,13 +73,11 @@ function timeAgo(iso: string): string {
 
 function severityColor(level: string): string {
   switch (level.toUpperCase()) {
-    case "MALICIOUS": return "#ef4444";
-    case "SUSPICIOUS": return "#f97316";
-    default: return "#eab308";
+    case "MALICIOUS":  return "#e0343a";
+    case "SUSPICIOUS": return "#f59e0b";
+    default:           return "#eab308";
   }
 }
-
-// ── Sub-components ────────────────────────────────────────────────────────────
 
 function Toggle({
   checked,
@@ -100,31 +94,8 @@ function Toggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      style={{
-        width: 44,
-        height: 24,
-        borderRadius: 12,
-        border: "none",
-        background: checked ? "#dc2626" : "#1e293b",
-        position: "relative",
-        cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background 0.2s",
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 3,
-          left: checked ? 23 : 3,
-          width: 18,
-          height: 18,
-          borderRadius: "50%",
-          background: "#fff",
-          transition: "left 0.2s",
-        }}
-      />
-    </button>
+      className={`toggle${checked ? " on" : ""}${disabled ? " disabled" : ""}`}
+    />
   );
 }
 
@@ -144,39 +115,16 @@ function ToggleCard({
   loading?: boolean;
 }) {
   return (
-    <div
-      style={{
-        background: "#0d0d14",
-        border: `1px solid ${checked ? "#1e293b" : "#1e293b"}`,
-        borderRadius: 10,
-        padding: "16px",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          background: "#1e1e2e",
-          borderRadius: 8,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </div>
+    <div className={`toggle-card${checked ? " active-border" : ""}`}>
+      <div className="toggle-icon">{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#f1f5f9" }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 2 }}>
           {title}
         </div>
         <div
           style={{
             fontSize: 11,
-            color: "#64748b",
+            color: "var(--text-3)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -200,40 +148,14 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div
-      style={{
-        background: "#0d0d14",
-        border: "1px solid #1e1e2e",
-        borderRadius: 10,
-        padding: "14px 16px",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 22,
-          fontWeight: 700,
-          color: accent ?? "#f1f5f9",
-          marginBottom: 2,
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
+    <div className="stat-card">
+      <div className="stat-value" style={accent ? { color: accent } : undefined}>
         {value}
       </div>
-      <div
-        style={{
-          fontSize: 10,
-          color: "#64748b",
-          textTransform: "uppercase",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {label}
-      </div>
+      <div className="stat-label">{label}</div>
     </div>
   );
 }
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export default function Home({ onNavigate }: HomeProps) {
   const [protection, setProtection] = useState<ProtectionStatus>({
@@ -242,17 +164,16 @@ export default function Home({ onNavigate }: HomeProps) {
     threats_blocked: 0,
     threats_flagged: 0,
   });
-  const [cloudStats, setCloudStats] = useState<CloudStats | null>(null);
-  const [liveAlerts, setLiveAlerts] = useState<RealtimeAlert[]>([]);
-  const [quarantine, setQuarantine] = useState<QuarantineEntry[]>([]);
+  const [cloudStats, setCloudStats]   = useState<CloudStats | null>(null);
+  const [liveAlerts, setLiveAlerts]   = useState<RealtimeAlert[]>([]);
+  const [quarantine, setQuarantine]   = useState<QuarantineEntry[]>([]);
   const [vpnConnected, setVpnConnected] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning]       = useState(false);
+  const [scanResult, setScanResult]   = useState<ScanResult | null>(null);
+  const [error, setError]             = useState<string | null>(null);
   const [togglingProtection, setTogglingProtection] = useState(false);
   const [showQuarantine, setShowQuarantine] = useState(false);
 
-  // Keep liveAlerts capped at 20 entries
   const addLiveAlert = useCallback((alert: RealtimeAlert) => {
     setLiveAlerts((prev) => [alert, ...prev].slice(0, 20));
   }, []);
@@ -271,37 +192,30 @@ export default function Home({ onNavigate }: HomeProps) {
     try {
       const cs = await invoke<CloudStats>("get_threat_stats");
       setCloudStats(cs);
-    } catch { /* cloud stats optional */ }
+    } catch { /* optional */ }
     try {
       const q = await invoke<QuarantineEntry[]>("get_quarantine");
       setQuarantine(q);
-    } catch { /* quarantine optional */ }
+    } catch { /* optional */ }
   }, []);
 
-  // Initial load + periodic refresh of counters
   useEffect(() => {
     loadData();
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Listen for real-time protection alerts emitted by Rust
   const unlistenRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     let cancelled = false;
     listen<RealtimeAlert>("protection-alert", (event) => {
       if (!cancelled) {
         addLiveAlert(event.payload);
-        // Refresh quarantine list when a file is quarantined
         if (event.payload.action === "quarantined") {
-          invoke<QuarantineEntry[]>("get_quarantine")
-            .then(setQuarantine)
-            .catch(() => {});
+          invoke<QuarantineEntry[]>("get_quarantine").then(setQuarantine).catch(() => {});
         }
       }
-    }).then((unlisten) => {
-      unlistenRef.current = unlisten;
-    });
+    }).then((unlisten) => { unlistenRef.current = unlisten; });
     return () => {
       cancelled = true;
       unlistenRef.current?.();
@@ -325,12 +239,7 @@ export default function Home({ onNavigate }: HomeProps) {
   const handleVpnToggle = async (on: boolean) => {
     try {
       if (on) {
-        const keys = await invoke<{ id: number; name: string }[]>("get_vpn_keys");
-        if (keys.length === 0) {
-          setError("No VPN devices configured. Add one at dashboard.redgaurd.com");
-          return;
-        }
-        await invoke("connect_vpn", { deviceId: keys[0].id });
+        await invoke("connect_vpn");
         setVpnConnected(true);
       } else {
         await invoke("disconnect_vpn");
@@ -375,121 +284,79 @@ export default function Home({ onNavigate }: HomeProps) {
     }
   };
 
-  const isProtected = protection.enabled && (cloudStats?.critical ?? 0) === 0;
-  const allThreats = protection.threats_blocked + protection.threats_flagged;
+  const isProtected  = protection.enabled && (cloudStats?.critical ?? 0) === 0;
+  const allThreats   = protection.threats_blocked + protection.threats_flagged;
+  const quarantinedCount = quarantine.filter((e) => !e.restored).length;
 
   return (
-    <div style={{ padding: "28px 32px", height: "100%", overflowY: "auto" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 24,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: "#f1f5f9",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Dashboard
-        </h2>
-        {quarantine.filter((e) => !e.restored).length > 0 && (
+    <div className="screen">
+      {/* Header */}
+      <div className="screen-header">
+        <h2 className="screen-title">Dashboard</h2>
+        {quarantinedCount > 0 && (
           <button
             onClick={() => setShowQuarantine(!showQuarantine)}
+            className="btn btn-secondary"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              background: "#7f1d1d",
-              border: "1px solid #ef4444",
-              borderRadius: 6,
-              color: "#fca5a5",
               fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
+              padding: "6px 12px",
+              border: "1px solid rgba(239,68,68,0.3)",
+              color: "#fca5a5",
+              background: "rgba(127,29,29,0.3)",
+              gap: 6,
             }}
           >
             <Lock size={12} />
-            {quarantine.filter((e) => !e.restored).length} Quarantined
+            {quarantinedCount} Quarantined
           </button>
         )}
       </div>
 
-      {/* Protection status hero */}
-      <div
-        style={{
-          background: "#0d0d14",
-          border: `1px solid ${isProtected ? "#166534" : "#7f1d1d"}`,
-          borderRadius: 12,
-          padding: "24px",
-          display: "flex",
-          alignItems: "center",
-          gap: 20,
-          marginBottom: 20,
-        }}
-      >
-        <div
-          style={{
-            width: 60,
-            height: 60,
-            borderRadius: "50%",
-            background: isProtected ? "#14532d" : "#450a0a",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-            boxShadow: isProtected ? "0 0 28px #22c55e28" : "0 0 28px #ef444428",
-          }}
-        >
+      {/* Protection hero */}
+      <div className={`hero-card${isProtected ? " safe" : " danger"}`}>
+        <div className={`hero-icon${isProtected ? " safe" : " danger"}`} style={{ position: "relative" }}>
+          {protection.enabled && (
+            <>
+              <div className={`pulse-ring${isProtected ? " green" : " red"}`} />
+              <div className={`pulse-ring${isProtected ? " green" : " red"} delay`} />
+            </>
+          )}
           {isProtected ? (
-            <ShieldCheck size={30} color="#22c55e" />
+            <ShieldCheck size={28} color="var(--green)" />
           ) : (
-            <ShieldAlert size={30} color="#ef4444" />
+            <ShieldAlert size={28} color="var(--red)" />
           )}
         </div>
         <div style={{ flex: 1 }}>
           <div
             style={{
-              fontSize: 19,
+              fontSize: 18,
               fontWeight: 700,
-              color: isProtected ? "#22c55e" : "#ef4444",
+              color: isProtected ? "var(--green)" : "var(--red)",
               marginBottom: 3,
             }}
           >
             {protection.enabled
-              ? isProtected
-                ? "You're Protected"
-                : "Threats Detected"
+              ? isProtected ? "You're Protected" : "Threats Detected"
               : "Protection Disabled"}
           </div>
-          <div style={{ color: "#64748b", fontSize: 13 }}>
+          <div style={{ color: "var(--text-3)", fontSize: 12.5 }}>
             {protection.enabled
               ? isProtected
-                ? "Real-time scanning is active — monitoring all high-risk locations."
+                ? "Real-time monitoring active — all high-risk locations covered."
                 : "Review the threats below and take action."
               : "Enable real-time protection to monitor your system."}
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: 4,
-          }}
-        >
-          <div style={{ fontSize: 11, color: "#475569" }}>Files scanned</div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 2, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Files scanned
+          </div>
           <div
             style={{
               fontSize: 26,
               fontWeight: 700,
-              color: "#94a3b8",
+              color: "var(--text-2)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
@@ -499,45 +366,31 @@ export default function Home({ onNavigate }: HomeProps) {
       </div>
 
       {/* Stats row */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr 1fr",
-          gap: 10,
-          marginBottom: 16,
-        }}
-      >
+      <div className="stat-grid">
         <StatCard
           label="Threats Blocked"
           value={protection.threats_blocked}
-          accent={protection.threats_blocked > 0 ? "#ef4444" : "#f1f5f9"}
+          accent={protection.threats_blocked > 0 ? "var(--red)" : undefined}
         />
         <StatCard
           label="Flagged"
           value={protection.threats_flagged}
-          accent={protection.threats_flagged > 0 ? "#f97316" : "#f1f5f9"}
+          accent={protection.threats_flagged > 0 ? "var(--amber)" : undefined}
         />
         <StatCard
           label="Cloud Alerts"
           value={cloudStats?.total_alerts ?? "—"}
-          accent={cloudStats && cloudStats.total_alerts > 0 ? "#eab308" : "#f1f5f9"}
+          accent={cloudStats && cloudStats.total_alerts > 0 ? "#eab308" : undefined}
         />
         <StatCard
           label="VPN"
           value={vpnConnected ? "On" : "Off"}
-          accent={vpnConnected ? "#22c55e" : "#64748b"}
+          accent={vpnConnected ? "var(--green)" : "var(--text-3)"}
         />
       </div>
 
-      {/* Toggle cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 10,
-          marginBottom: 16,
-        }}
-      >
+      {/* Toggles */}
+      <div className="toggle-grid">
         <ToggleCard
           title="Malware Protection"
           subtitle={
@@ -545,12 +398,7 @@ export default function Home({ onNavigate }: HomeProps) {
               ? `Active — ${allThreats} threat${allThreats !== 1 ? "s" : ""} caught`
               : "Disabled — system unmonitored"
           }
-          icon={
-            <Shield
-              size={18}
-              color={protection.enabled ? "#dc2626" : "#64748b"}
-            />
-          }
+          icon={<Shield size={17} color={protection.enabled ? "var(--red)" : "var(--text-3)"} />}
           checked={protection.enabled}
           onChange={handleProtectionToggle}
           loading={togglingProtection}
@@ -558,7 +406,7 @@ export default function Home({ onNavigate }: HomeProps) {
         <ToggleCard
           title="VPN Protection"
           subtitle={vpnConnected ? "US East — New York" : "Not connected"}
-          icon={<Globe size={18} color={vpnConnected ? "#22c55e" : "#64748b"} />}
+          icon={<Globe size={17} color={vpnConnected ? "var(--green)" : "var(--text-3)"} />}
           checked={vpnConnected}
           onChange={handleVpnToggle}
         />
@@ -566,294 +414,166 @@ export default function Home({ onNavigate }: HomeProps) {
 
       {/* Error */}
       {error && (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: "8px 12px",
-            background: "#ef444418",
-            border: "1px solid #ef444430",
-            borderRadius: 7,
-            color: "#ef4444",
-            fontSize: 12,
-          }}
-        >
-          {error}
-          <button
-            onClick={() => setError(null)}
-            style={{
-              float: "right",
-              background: "none",
-              border: "none",
-              color: "#ef4444",
-              cursor: "pointer",
-              fontSize: 14,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
+        <div className="error-banner">
+          <span>{error}</span>
+          <button className="error-dismiss" onClick={() => setError(null)}>×</button>
         </div>
       )}
 
-      {/* Scan file */}
-      <div style={{ marginBottom: 20 }}>
+      {/* Quick scan button */}
+      <div style={{ marginBottom: 22, display: "flex", alignItems: "center", gap: 12 }}>
         <button
           onClick={handleScanFile}
           disabled={scanning}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "9px 16px",
-            background: scanning ? "#1e1e2e" : "#dc2626",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: scanning ? "not-allowed" : "pointer",
-            transition: "background 0.15s",
-          }}
+          className="btn btn-secondary"
+          style={{ gap: 8 }}
         >
           <FileSearch size={15} />
           {scanning ? "Scanning…" : "Scan a file"}
         </button>
-
         {scanResult && (
-          <div
-            style={{
-              marginTop: 10,
-              padding: "10px 14px",
-              background: "#0d0d14",
-              border: "1px solid #1e1e2e",
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
-            <span style={{ color: "#94a3b8", fontSize: 13 }}>Result:</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <StatusBadge label={scanResult.threat_level} />
-            <span style={{ color: "#64748b", fontSize: 12 }}>
+            <span style={{ color: "var(--text-3)", fontSize: 12 }}>
               {(scanResult.score * 100).toFixed(1)}% confidence
             </span>
           </div>
         )}
       </div>
 
-      {/* Quarantine panel */}
+      {/* Quarantine vault */}
       {showQuarantine && quarantine.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
+        <div className="vault-card">
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: 10,
+              padding: "10px 14px",
+              borderBottom: "1px solid rgba(239,68,68,0.15)",
             }}
           >
-            <h3
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#fca5a5", display: "flex", alignItems: "center", gap: 6 }}>
+              <Lock size={12} color="#ef4444" /> Quarantine Vault
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-3)" }}>XOR-encrypted — cannot execute</span>
+          </div>
+          {quarantine.map((entry, i) => (
+            <div
+              key={entry.id}
               style={{
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#fca5a5",
                 display: "flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 10,
+                padding: "10px 14px",
+                borderBottom: i < quarantine.length - 1 ? "1px solid var(--border-sub)" : "none",
+                opacity: entry.restored ? 0.45 : 1,
               }}
             >
-              <Lock size={13} color="#ef4444" />
-              Quarantine Vault
-            </h3>
-            <span style={{ fontSize: 11, color: "#64748b" }}>
-              XOR-encrypted — cannot execute
-            </span>
-          </div>
-          <div
-            style={{
-              background: "#0d0d14",
-              border: "1px solid #7f1d1d",
-              borderRadius: 8,
-              overflow: "hidden",
-            }}
-          >
-            {quarantine.map((entry, i) => (
-              <div
-                key={entry.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "10px 14px",
-                  borderBottom:
-                    i < quarantine.length - 1
-                      ? "1px solid #1e1e2e"
-                      : "none",
-                  opacity: entry.restored ? 0.45 : 1,
-                }}
-              >
-                <Lock size={13} color="#ef4444" style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#f1f5f9",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {entry.filename}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#475569" }}>
-                    {entry.sha256.slice(0, 16)}… · {(entry.score * 100).toFixed(0)}%
-                    · {timeAgo(entry.timestamp)}
-                  </div>
+              <Lock size={12} color="#ef4444" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, color: "var(--text-1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {entry.filename}
                 </div>
-                <StatusBadge label={entry.threat_level} />
-                {!entry.restored && (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button
-                      onClick={() => handleRestore(entry.id)}
-                      title="Restore file"
-                      style={{
-                        background: "none",
-                        border: "1px solid #334155",
-                        borderRadius: 5,
-                        padding: "4px 6px",
-                        color: "#94a3b8",
-                        cursor: "pointer",
-                        display: "flex",
-                      }}
-                    >
-                      <RotateCcw size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(entry.id)}
-                      title="Delete permanently"
-                      style={{
-                        background: "none",
-                        border: "1px solid #7f1d1d",
-                        borderRadius: 5,
-                        padding: "4px 6px",
-                        color: "#ef4444",
-                        cursor: "pointer",
-                        display: "flex",
-                      }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                )}
-                {entry.restored && (
-                  <span style={{ fontSize: 11, color: "#64748b" }}>Restored</span>
-                )}
+                <div style={{ fontSize: 10, color: "var(--text-3)" }}>
+                  {entry.sha256.slice(0, 14)}… · {(entry.score * 100).toFixed(0)}% · {timeAgo(entry.timestamp)}
+                </div>
               </div>
-            ))}
-          </div>
+              <StatusBadge label={entry.threat_level} />
+              {!entry.restored && (
+                <div style={{ display: "flex", gap: 5 }}>
+                  <button
+                    onClick={() => handleRestore(entry.id)}
+                    title="Restore"
+                    className="btn-ghost"
+                    style={{ padding: "4px 6px" }}
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(entry.id)}
+                    title="Delete permanently"
+                    className="btn-ghost"
+                    style={{ padding: "4px 6px", color: "#ef4444" }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              )}
+              {entry.restored && (
+                <span style={{ fontSize: 10, color: "var(--text-3)" }}>Restored</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Live threat feed */}
+      {/* Live alert feed */}
       <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8" }}>
-            Real-time Alerts
-          </h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <h3 style={{ fontSize: 12, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+              Real-time Alerts
+            </h3>
+            {liveAlerts.length > 0 && (
+              <span className="live-dot green" style={{ marginTop: 1 }} />
+            )}
+          </div>
           <button
             onClick={() => onNavigate("threats")}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#dc2626",
-              fontSize: 12,
-              cursor: "pointer",
-            }}
+            className="btn-ghost"
+            style={{ fontSize: 12, color: "var(--red)", padding: "4px 8px" }}
           >
-            View cloud alerts →
+            Cloud alerts →
           </button>
         </div>
 
         {liveAlerts.length === 0 ? (
           <div
             style={{
-              padding: "20px",
+              padding: "24px",
               textAlign: "center",
-              color: "#475569",
+              color: "var(--text-3)",
               fontSize: 13,
-              background: "#0d0d14",
-              border: "1px solid #1e1e2e",
-              borderRadius: 8,
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--r-md)",
             }}
           >
             No threats detected this session
           </div>
         ) : (
-          <div
-            style={{
-              background: "#0d0d14",
-              border: "1px solid #1e1e2e",
-              borderRadius: 8,
-              overflow: "hidden",
-            }}
-          >
+          <div className="card-list">
             {liveAlerts.map((alert, i) => (
               <div
                 key={`${alert.timestamp}-${i}`}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  padding: "11px 14px",
-                  borderBottom:
-                    i < liveAlerts.length - 1 ? "1px solid #1e1e2e" : "none",
-                  borderLeft: `3px solid ${severityColor(alert.threat_level)}`,
-                }}
+                className="alert-row"
+                style={{ borderLeft: `3px solid ${severityColor(alert.threat_level)}` }}
               >
-                <AlertTriangle
-                  size={14}
-                  color={severityColor(alert.threat_level)}
-                  style={{ flexShrink: 0, marginTop: 2 }}
-                />
+                <AlertTriangle size={13} color={severityColor(alert.threat_level)} style={{ flexShrink: 0, marginTop: 2 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 2,
-                    }}
-                  >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                     <span
                       style={{
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: 600,
-                        color: "#f1f5f9",
+                        color: "var(--text-1)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        maxWidth: 220,
+                        maxWidth: 200,
                       }}
                     >
                       {alert.filename}
                     </span>
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 9.5,
                         padding: "1px 6px",
                         borderRadius: 4,
-                        background:
-                          alert.action === "quarantined" ? "#7f1d1d" : "#431407",
-                        color:
-                          alert.action === "quarantined" ? "#fca5a5" : "#fed7aa",
-                        fontWeight: 600,
+                        background: alert.action === "quarantined" ? "rgba(127,29,29,0.5)" : "rgba(67,20,7,0.5)",
+                        color: alert.action === "quarantined" ? "#fca5a5" : "#fed7aa",
+                        fontWeight: 700,
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                         flexShrink: 0,
@@ -862,39 +582,15 @@ export default function Home({ onNavigate }: HomeProps) {
                       {alert.action}
                     </span>
                   </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#64748b",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <div style={{ fontSize: 11, color: "var(--text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {alert.detail}
                   </div>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: 3,
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: severityColor(alert.threat_level),
-                    }}
-                  >
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: severityColor(alert.threat_level) }}>
                     {(alert.score * 100).toFixed(0)}%
                   </span>
-                  <span style={{ fontSize: 10, color: "#475569" }}>
-                    {timeAgo(alert.timestamp)}
-                  </span>
+                  <span style={{ fontSize: 10, color: "var(--text-3)" }}>{timeAgo(alert.timestamp)}</span>
                 </div>
               </div>
             ))}

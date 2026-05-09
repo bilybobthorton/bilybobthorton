@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { Shield, X, Download } from "lucide-react";
 import NavBar from "./components/NavBar";
 import Login from "./screens/Login";
 import Home from "./screens/Home";
@@ -28,40 +29,36 @@ export interface AuthState {
 const STORE_FILE = "redguard.dat";
 
 export default function App() {
-  const [auth, setAuth] = useState<AuthState | null>(null);
-  const [screen, setScreen] = useState<Screen>("home");
+  const [auth, setAuth]       = useState<AuthState | null>(null);
+  const [screen, setScreen]   = useState<Screen>("home");
   const [loading, setLoading] = useState(true);
-  const [update, setUpdate] = useState<UpdateInfo | null>(null);
+  const [update, setUpdate]   = useState<UpdateInfo | null>(null);
 
-  // Check for app updates ~10s after launch (let the UI settle first).
+  // Check for updates 10s after launch.
   useEffect(() => {
     const timer = setTimeout(async () => {
       try {
         const current = await getVersion();
-        const info = await invoke<UpdateInfo | null>("check_for_update", {
-          currentVersion: current,
-        });
+        const info = await invoke<UpdateInfo | null>("check_for_update", { currentVersion: current });
         if (info) setUpdate(info);
       } catch {
-        // Non-critical — silently ignore network errors.
+        // Non-critical.
       }
     }, 10_000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Restore session from persisted store on mount.
+  // Restore session.
   useEffect(() => {
     (async () => {
       try {
         const store = await load(STORE_FILE, { autoSave: false, defaults: {} });
         const token = await store.get<string>("token");
         const email = await store.get<string>("email");
-        const tier = await store.get<string>("tier");
-        if (token && email) {
-          setAuth({ token, email, tier: tier ?? "free" });
-        }
+        const tier  = await store.get<string>("tier");
+        if (token && email) setAuth({ token, email, tier: tier ?? "free" });
       } catch {
-        // Store not yet initialised — first launch.
+        // First launch.
       } finally {
         setLoading(false);
       }
@@ -82,11 +79,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    try {
-      await invoke("logout");
-    } catch {
-      // Best effort.
-    }
+    try { await invoke("logout"); } catch { /* best effort */ }
     try {
       const store = await load(STORE_FILE, { autoSave: false, defaults: {} });
       await store.delete("token");
@@ -105,82 +98,74 @@ export default function App() {
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           height: "100%",
-          background: "#0a0a0f",
-          color: "#64748b",
+          background: "var(--bg)",
+          gap: 16,
         }}
       >
-        Loading…
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            background: "var(--red)",
+            borderRadius: 12,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 24px var(--red-25)",
+          }}
+        >
+          <Shield size={24} color="#fff" />
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-3)" }}>Loading…</div>
       </div>
     );
   }
 
-  if (!auth) {
-    return <Login onLogin={handleLogin} />;
-  }
+  if (!auth) return <Login onLogin={handleLogin} />;
 
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
-      {/* Update available banner */}
+      {/* Update toast */}
       {update && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 20,
-            right: 20,
-            zIndex: 1000,
-            background: "#1e1e2e",
-            border: "1px solid #dc2626",
-            borderRadius: 10,
-            padding: "16px 20px",
-            width: 300,
-            boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "#f1f5f9", marginBottom: 4 }}>
-            Update Available — v{update.version}
+        <div className="update-toast">
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, color: "var(--text-1)", fontSize: 13 }}>
+              Update Available — v{update.version}
+            </div>
+            <button
+              onClick={() => setUpdate(null)}
+              style={{ background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", padding: 0, lineHeight: 1 }}
+            >
+              <X size={14} />
+            </button>
           </div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>
+          <div style={{ fontSize: 11.5, color: "var(--text-3)", marginBottom: 14, lineHeight: 1.5 }}>
             {update.release_notes}
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={() =>
-                invoke("open_browser_url", { url: update.download_url })
-              }
-              style={{
-                flex: 1,
-                padding: "8px 0",
-                borderRadius: 6,
-                border: "none",
-                background: "#dc2626",
-                color: "#fff",
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-              }}
+              onClick={() => invoke("open_browser_url", { url: update.download_url })}
+              className="btn btn-primary"
+              style={{ flex: 1, justifyContent: "center", gap: 6, padding: "8px 0", fontSize: 12 }}
             >
+              <Download size={12} />
               Download
             </button>
             <button
               onClick={() => setUpdate(null)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 6,
-                border: "1px solid #334155",
-                background: "transparent",
-                color: "#64748b",
-                fontSize: 13,
-                cursor: "pointer",
-              }}
+              className="btn btn-secondary"
+              style={{ padding: "8px 14px", fontSize: 12 }}
             >
               Later
             </button>
           </div>
         </div>
       )}
+
       <NavBar
         screen={screen}
         onNavigate={setScreen}
@@ -188,15 +173,14 @@ export default function App() {
         tier={auth.tier}
         onLogout={handleLogout}
       />
-      <main style={{ flex: 1, overflow: "auto" }}>
-        {screen === "home" && <Home auth={auth} onNavigate={setScreen} />}
-        {screen === "vpn" && <VPN />}
-        {screen === "threats" && <Threats />}
-        {screen === "scan" && <Scan />}
+
+      <main style={{ flex: 1, overflow: "auto", background: "var(--bg)" }}>
+        {screen === "home"            && <Home auth={auth} onNavigate={setScreen} />}
+        {screen === "vpn"             && <VPN />}
+        {screen === "threats"         && <Threats />}
+        {screen === "scan"            && <Scan />}
         {screen === "vulnerabilities" && <Vulnerabilities />}
-        {screen === "settings" && (
-          <Settings auth={auth} onLogout={handleLogout} />
-        )}
+        {screen === "settings"        && <Settings auth={auth} onLogout={handleLogout} />}
       </main>
     </div>
   );

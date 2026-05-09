@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react";
 import StatusBadge from "../components/StatusBadge";
 
 interface Alert {
@@ -14,10 +14,10 @@ interface Alert {
 type Filter = "all" | "critical" | "high" | "medium";
 
 const FILTERS: { id: Filter; label: string }[] = [
-  { id: "all", label: "All" },
+  { id: "all",      label: "All" },
   { id: "critical", label: "Critical" },
-  { id: "high", label: "High" },
-  { id: "medium", label: "Medium" },
+  { id: "high",     label: "High" },
+  { id: "medium",   label: "Medium" },
 ];
 
 function timeAgo(iso: string): string {
@@ -30,210 +30,124 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function severityIcon(severity: string) {
-  const color =
-    severity === "critical"
-      ? "#ef4444"
-      : severity === "high"
-      ? "#f97316"
-      : "#eab308";
-  return <AlertTriangle size={16} color={color} />;
+function severityColor(severity: string): string {
+  switch (severity) {
+    case "critical": return "#e0343a";
+    case "high":     return "#f97316";
+    default:         return "#eab308";
+  }
 }
 
 export default function Threats() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await invoke<Alert[]>("get_alerts", { limit: 50 });
-        setAlerts(data);
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await invoke<Alert[]>("get_alerts", { limit: 50 });
+      setAlerts(data);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filtered =
-    filter === "all" ? alerts : alerts.filter((a) => a.severity === filter);
+  useEffect(() => { load(); }, []);
+
+  const filtered = filter === "all" ? alerts : alerts.filter((a) => a.severity === filter);
 
   return (
-    <div style={{ padding: "28px 32px", height: "100%", overflowY: "auto" }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 24,
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: "#f1f5f9",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Threats
-        </h2>
-        <span style={{ fontSize: 12, color: "#475569" }}>
-          {alerts.length} total
-        </span>
+    <div className="screen">
+      <div className="screen-header">
+        <h2 className="screen-title">Threats</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 12, color: "var(--text-3)" }}>{alerts.length} total</span>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="btn btn-secondary"
+            style={{ padding: "6px 10px", gap: 6, fontSize: 12 }}
+          >
+            <RefreshCw size={12} className={loading ? "spin" : ""} />
+            {loading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
-      <div
-        style={{
-          display: "flex",
-          gap: 6,
-          marginBottom: 20,
-        }}
-      >
-        {FILTERS.map((f) => {
-          const active = filter === f.id;
-          return (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 20,
-                border: active ? "none" : "1px solid #1e1e2e",
-                background: active ? "#dc2626" : "transparent",
-                color: active ? "#fff" : "#64748b",
-                fontSize: 12,
-                fontWeight: active ? 600 : 400,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
-              {f.label}
-            </button>
-          );
-        })}
+      <div className="filter-bar">
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            className={`filter-pill${filter === f.id ? " active" : ""}`}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
-      {loading && (
-        <div style={{ textAlign: "center", color: "#475569", padding: "40px 0" }}>
-          Loading…
-        </div>
-      )}
-
       {error && (
-        <div
-          style={{
-            padding: "10px 14px",
-            background: "#ef444418",
-            border: "1px solid #ef444430",
-            borderRadius: 8,
-            color: "#ef4444",
-            fontSize: 13,
-            marginBottom: 16,
-          }}
-        >
-          {error}
+        <div className="error-banner" style={{ marginBottom: 16 }}>
+          <span>{error}</span>
+          <button className="error-dismiss" onClick={() => setError(null)}>×</button>
         </div>
       )}
 
       {!loading && filtered.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "60px 0",
-            color: "#475569",
-          }}
-        >
-          <CheckCircle
-            size={40}
-            color="#22c55e"
-            style={{ margin: "0 auto 12px" }}
-          />
-          <div style={{ fontSize: 15, color: "#94a3b8", marginBottom: 4 }}>
-            No threats detected
-          </div>
-          <div style={{ fontSize: 13 }}>
-            {filter === "all"
-              ? "Your system is clean."
-              : `No ${filter} severity threats found.`}
+        <div className="empty-state">
+          <CheckCircle size={40} color="var(--green)" />
+          <div className="empty-state-title">No threats detected</div>
+          <div>
+            {filter === "all" ? "Your system is clean." : `No ${filter} severity threats.`}
           </div>
         </div>
       )}
 
       {!loading && filtered.length > 0 && (
-        <div
-          style={{
-            background: "#0d0d14",
-            border: "1px solid #1e1e2e",
-            borderRadius: 10,
-            overflow: "hidden",
-          }}
-        >
+        <div className="card-list">
           {filtered.map((alert, i) => (
             <div
               key={alert.id}
+              className="card-list-row"
               style={{
-                display: "flex",
-                alignItems: "flex-start",
                 gap: 14,
-                padding: "14px 16px",
-                borderBottom:
-                  i < filtered.length - 1 ? "1px solid #1e1e2e" : "none",
-                transition: "background 0.1s",
+                alignItems: "flex-start",
+                borderLeft: `3px solid ${severityColor(alert.severity)}`,
               }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLDivElement).style.background =
-                  "#0a0a0f")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLDivElement).style.background =
-                  "transparent")
-              }
             >
-              <div style={{ marginTop: 1 }}>{severityIcon(alert.severity)}</div>
+              <AlertTriangle
+                size={15}
+                color={severityColor(alert.severity)}
+                style={{ flexShrink: 0, marginTop: 1 }}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: "#cbd5e1",
-                    marginBottom: 3,
-                    lineHeight: 1.4,
-                  }}
-                >
+                <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 4, lineHeight: 1.4 }}>
                   {alert.message}
                 </div>
                 {alert.file_path && (
                   <div
                     style={{
-                      fontSize: 11,
-                      color: "#475569",
+                      fontSize: 10.5,
+                      color: "var(--text-3)",
                       fontFamily: "monospace",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
-                      marginBottom: 4,
+                      marginBottom: 5,
                     }}
                     title={alert.file_path}
                   >
                     {alert.file_path}
                   </div>
                 )}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 11,
-                    color: "#475569",
-                  }}
-                >
-                  <Clock size={11} />
+                <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: "var(--text-3)" }}>
+                  <Clock size={10} />
                   {timeAgo(alert.created_at)}
                 </div>
               </div>
