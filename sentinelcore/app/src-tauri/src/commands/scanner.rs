@@ -1,15 +1,15 @@
 use crate::commands::auth::get_token;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 use std::time::Duration;
+use tauri::Emitter;
 use walkdir::WalkDir;
 
 const API_BASE: &str = "https://api.redgaurd.com";
 
-const KNOWN_BAD_HASHES: &str = include_str!("../../../../signatures/malware_hashes.txt");
+const KNOWN_BAD_HASHES: &str = include_str!("../../../../engine/signatures/malware_hashes.txt");
 
 static SCAN_RUNNING: OnceLock<AtomicBool> = OnceLock::new();
 

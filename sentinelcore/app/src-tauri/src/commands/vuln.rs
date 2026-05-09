@@ -1,6 +1,7 @@
 use crate::commands::auth::get_token;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use tauri::Emitter;
 
 const API_BASE: &str = "https://api.redgaurd.com";
 const CHUNK_SIZE: usize = 20; // NVD scan limit per request

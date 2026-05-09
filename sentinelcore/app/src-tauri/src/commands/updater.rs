@@ -30,6 +30,7 @@ pub async fn check_for_update(current_version: String) -> Option<UpdateInfo> {
 
 /// Open a URL in the system default browser.
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn open_browser_url(app: tauri::AppHandle, url: String) {
     use tauri_plugin_shell::ShellExt;
     let _ = app.shell().open(&url, None);

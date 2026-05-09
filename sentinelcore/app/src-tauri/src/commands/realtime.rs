@@ -21,7 +21,7 @@ use std::sync::{
     Arc, Mutex, OnceLock,
 };
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
