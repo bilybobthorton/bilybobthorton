@@ -218,34 +218,50 @@ def collect_from_theZoo(theZoo_path: Path, target: int) -> int:
             break
         try:
             with zipfile.ZipFile(zip_path) as zf:
-                extracted = False
+                names = zf.namelist()
+                working_pwd: bytes | None = None
+
+                # Find the password that opens this ZIP
                 for pwd in passwords:
-                    if extracted:
+                    try:
+                        zf.read(names[0], pwd=pwd)
+                        working_pwd = pwd
                         break
-                    for name in zf.namelist():
-                        safe_name = Path(name).name  # strip any path component
-                        if not safe_name or safe_name in seen:
-                            continue
-                        try:
-                            data = zf.read(name, pwd=pwd)
-                        except Exception:
-                            continue
-                        if len(data) < 512:
-                            continue
-                        # Accept PE (MZ header) or any binary that's not text
-                        if data[:2] == b"MZ":
-                            dest = MALWARE_DIR / safe_name
-                            dest.write_bytes(data)
-                            seen.add(safe_name)
-                            collected += 1
-                            extracted = True
-                            if collected % 100 == 0:
-                                log.info("  Extracted %d malware samples so far...", collected)
-                            break  # one file per ZIP is fine
+                    except Exception:
+                        continue
+
+                if working_pwd is None:
+                    continue  # can't open this ZIP
+
+                # Extract ALL PE files from the ZIP (collections have many)
+                for name in names:
+                    if collected >= target:
+                        break
+                    safe_name = Path(name).name
+                    if not safe_name:
+                        continue
+                    # Deduplicate: prefix with zip stem to avoid collisions across ZIPs
+                    unique_name = f"{zip_path.stem}__{safe_name}"
+                    if unique_name in seen:
+                        continue
+                    try:
+                        data = zf.read(name, pwd=working_pwd)
+                    except Exception:
+                        continue
+                    if len(data) < 512:
+                        continue
+                    if data[:2] != b"MZ":
+                        continue  # skip non-PE (Android APK, BAT, DOS COM, etc.)
+                    dest = MALWARE_DIR / unique_name
+                    dest.write_bytes(data)
+                    seen.add(unique_name)
+                    collected += 1
+                    if collected % 50 == 0:
+                        log.info("  Extracted %d PE malware samples so far...", collected)
         except Exception:
             continue
 
-    log.info("theZoo extraction complete: %d malware samples in %s", collected, MALWARE_DIR)
+    log.info("theZoo extraction complete: %d PE malware samples in %s", collected, MALWARE_DIR)
     return collected
 
 
