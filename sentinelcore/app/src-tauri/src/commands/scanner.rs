@@ -322,6 +322,18 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
         if !scan_flag().load(Ordering::Relaxed) {
             break;
         }
+        // Emit directory-level progress so the user sees activity immediately
+        let _ = window.emit(
+            "scan-progress",
+            ScanProgress {
+                scanned,
+                threats: threats.len() as u64,
+                current_file: format!("Searching {dir}…"),
+                done: false,
+                phase: "scanning".into(),
+            },
+        );
+
         let walker = WalkDir::new(&dir)
             .follow_links(false)
             .same_file_system(true)
@@ -352,19 +364,17 @@ pub fn scan_system(window: tauri::Window, scan_mode: Option<String>) -> Result<V
             scanned += 1;
             let path_str = path.to_string_lossy().to_string();
 
-            // Emit progress every 5 files
-            if scanned % 5 == 0 {
-                let _ = window.emit(
-                    "scan-progress",
-                    ScanProgress {
-                        scanned,
-                        threats: threats.len() as u64,
-                        current_file: path_str.clone(),
-                        done: false,
-                        phase: "scanning".into(),
-                    },
-                );
-            }
+            // Emit progress on every file so the counter updates in real-time
+            let _ = window.emit(
+                "scan-progress",
+                ScanProgress {
+                    scanned,
+                    threats: threats.len() as u64,
+                    current_file: path_str.clone(),
+                    done: false,
+                    phase: "scanning".into(),
+                },
+            );
 
             // Read file data (needed for hash + heuristics)
             let Ok(data) = std::fs::read(path) else {
