@@ -79,12 +79,6 @@ export default function App() {
     } catch (e) {
       console.warn("Failed to persist auth:", e);
     }
-    // Show the main window after login (in case it was hidden).
-    try {
-      await invoke("show_window");
-    } catch {
-      // Not critical if this fails in dev.
-    }
   };
 
   const handleLogout = async () => {
