@@ -79,7 +79,9 @@ PE_TYPES = {"exe", "dll", "sys", "drv"}
 
 # ── MalwareBazaar helpers ─────────────────────────────────────────────────────
 
-MB_BULK_CSV = "https://bazaar.abuse.ch/export/csv/full/"
+MB_BULK_CSV    = "https://bazaar.abuse.ch/export/csv/full/"
+MB_DAILY_FEED  = "https://datalake.abuse.ch/malware-bazaar/daily/"
+MB_HOURLY_FEED = "https://datalake.abuse.ch/malware-bazaar/hourly/"
 
 
 def _mb_post(data: dict, timeout: int = 30) -> dict:
@@ -87,6 +89,119 @@ def _mb_post(data: dict, timeout: int = 30) -> dict:
     r = requests.post(MB_API, data=data, timeout=timeout)
     r.raise_for_status()
     return r.json()
+
+
+def _extract_pe_from_zip_bytes(raw: bytes, dest_dir: Path, seen: set, prefix: str = "") -> int:
+    """
+    Extract PE files from a ZIP blob (password 'infected').
+    Returns count of new PE files written to dest_dir.
+    """
+    count = 0
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            for name in zf.namelist():
+                safe = Path(name).name
+                if not safe:
+                    continue
+                unique = f"{prefix}__{safe}" if prefix else safe
+                if unique in seen:
+                    continue
+                try:
+                    data = zf.read(name, pwd=ZIP_PASS)
+                except Exception:
+                    try:
+                        data = zf.read(name)
+                    except Exception:
+                        continue
+                if len(data) < 512 or data[:2] != b"MZ":
+                    continue
+                dest = dest_dir / unique
+                dest.write_bytes(data)
+                seen.add(unique)
+                count += 1
+    except Exception:
+        pass
+    return count
+
+
+def _download_mb_daily_feeds(days_back: int = 30) -> int:
+    """
+    Download MalwareBazaar daily batch ZIPs — NO authentication required, no rate limit.
+    Each daily ZIP contains every sample submitted that day, password 'infected'.
+    Returns total new PE files written to MALWARE_DIR.
+    """
+    import requests
+    from datetime import date, timedelta
+
+    MALWARE_DIR.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = {f.name for f in MALWARE_DIR.iterdir()}
+    total_new = 0
+
+    log.info("Downloading MalwareBazaar daily feeds (last %d days, no auth required)...", days_back)
+    today = date.today()
+
+    for delta in range(1, days_back + 1):
+        day = today - timedelta(days=delta)
+        day_str = day.strftime("%Y-%m-%d")
+        url = f"{MB_DAILY_FEED}{day_str}.zip"
+        try:
+            log.info("  Fetching daily feed: %s", day_str)
+            r = requests.get(url, timeout=300, stream=True)
+            if r.status_code == 404:
+                log.debug("  %s not available yet, skipping", day_str)
+                continue
+            r.raise_for_status()
+            raw = r.content
+            new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=day_str)
+            total_new += new
+            log.info("  %s → %d new PE samples (running total: %d)", day_str, new, total_new)
+        except Exception as e:
+            log.warning("  Daily feed %s failed: %s", day_str, e)
+            continue
+
+    return total_new
+
+
+def _download_mb_hourly_feeds(hours_back: int = 24) -> int:
+    """
+    Download MalwareBazaar hourly batch ZIPs — NO authentication required.
+    Useful for getting samples from the current day before the daily ZIP is published.
+    """
+    import requests
+    from datetime import datetime, timedelta, timezone
+
+    MALWARE_DIR.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = {f.name for f in MALWARE_DIR.iterdir()}
+    total_new = 0
+
+    log.info("Downloading MalwareBazaar hourly feeds (last %d hours)...", hours_back)
+    now = datetime.now(timezone.utc)
+
+    for h in range(1, hours_back + 1):
+        ts = now - timedelta(hours=h)
+        # Try common filename formats abuse.ch uses for hourly zips
+        for fmt in [
+            ts.strftime("%Y-%m-%d_%H-00-00.zip"),
+            ts.strftime("%Y-%m-%dT%H:00:00.zip"),
+            ts.strftime("%Y%m%d%H.zip"),
+        ]:
+            url = f"{MB_HOURLY_FEED}{fmt}"
+            try:
+                r = requests.get(url, timeout=120, stream=True)
+                if r.status_code == 404:
+                    continue
+                r.raise_for_status()
+                raw = r.content
+                prefix = ts.strftime("h%Y%m%d%H")
+                new = _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=prefix)
+                total_new += new
+                if new:
+                    log.info("  Hourly %s → %d new PE samples", fmt, new)
+                break
+            except Exception:
+                continue
+
+    return total_new
 
 
 def _get_hashes_recent(limit: int = 1000) -> list[str]:
@@ -102,58 +217,6 @@ def _get_hashes_recent(limit: int = 1000) -> list[str]:
         ]
     except Exception as e:
         log.warning("get_recent failed: %s", e)
-        return []
-
-
-def _get_hashes_bulk_csv(target: int = 15000) -> list[str]:
-    """
-    Download the full MalwareBazaar CSV export and extract PE SHA256 hashes.
-    No API key required. ~50 MB download, thousands of diverse samples.
-
-    MalwareBazaar CSV has NO header row — column names live in #-prefixed comment
-    lines that we must skip. Positional layout (0-indexed):
-      0=first_seen  1=sha256_hash  2=md5  3=sha1  4=reporter
-      5=file_name   6=file_type_guess  7=mime_type  ...
-    """
-    import csv
-    import requests
-    log.info("Downloading MalwareBazaar full CSV export (~50 MB)...")
-    try:
-        r = requests.get(MB_BULK_CSV, timeout=180, stream=True)
-        r.raise_for_status()
-        raw = r.content
-        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-            csv_name = next((n for n in zf.namelist() if n.endswith(".csv")), None)
-            if not csv_name:
-                log.warning("No CSV found in bulk export ZIP")
-                return []
-            csv_text = zf.read(csv_name).decode("utf-8", errors="replace")
-
-        # Column indices in the headerless CSV
-        SHA256_COL = 1
-        FTYPE_COL  = 6
-
-        hashes: list[str] = []
-        for line in csv_text.splitlines():
-            if not line or line.startswith("#"):
-                continue
-            try:
-                row = next(csv.reader([line]))
-                if len(row) <= max(SHA256_COL, FTYPE_COL):
-                    continue
-                sha = row[SHA256_COL].strip().strip('"')
-                ft  = row[FTYPE_COL].strip().strip('"').lower()
-                if sha and ft in PE_TYPES:
-                    hashes.append(sha)
-                if len(hashes) >= target:
-                    break
-            except Exception:
-                continue
-
-        log.info("Bulk CSV: %d PE hashes found.", len(hashes))
-        return hashes
-    except Exception as e:
-        log.warning("Bulk CSV download failed: %s", e)
         return []
 
 
@@ -293,141 +356,81 @@ def _download_one_malshare(sha256: str, api_key: str, dest_dir: Path) -> bool:
     return False
 
 
-def download_malware(per_family: int, threads: int, api_key: str = "", malshare_key: str = "") -> Path:
+def download_malware(
+    per_family: int,
+    threads: int,
+    api_key: str = "",
+    malshare_key: str = "",
+    days_back: int = 30,
+) -> Path:
+    """
+    Download malware samples using multiple sources in priority order:
+      1. MalwareBazaar daily batch ZIPs — NO auth, NO rate limit (primary)
+      2. MalwareBazaar hourly feeds    — NO auth (fills in current day)
+      3. Malshare per-file API         — API key, 2000/day limit
+    """
+    import requests as _req
+
     MALWARE_DIR.mkdir(parents=True, exist_ok=True)
-    existing = {f.name for f in MALWARE_DIR.iterdir()}
-    log.info("Already have %d malware samples locally.", len(existing))
+    before = len(list(MALWARE_DIR.iterdir()))
+    log.info("Starting download. Already have %d malware samples.", before)
 
-    if not api_key and not malshare_key:
-        log.error(
-            "\n"
-            "  No download API key provided. You need one of:\n"
-            "\n"
-            "  Option A — Malshare (recommended, easiest):\n"
-            "    1. Sign up free at malshare.com/register.php\n"
-            "    2. Re-run: python scripts/train_real_model.py --malshare-key YOUR_KEY\n"
-            "\n"
-            "  Option B — MalwareBazaar:\n"
-            "    1. Sign up free at bazaar.abuse.ch/signup/\n"
-            "    2. Re-run: python scripts/train_real_model.py --mb-api-key YOUR_KEY\n"
-        )
-        sys.exit(1)
+    # ── 1. MalwareBazaar daily feeds (no auth, highest yield) ────────────────
+    daily_new = _download_mb_daily_feeds(days_back=days_back)
+    log.info("Daily feeds: +%d new PE samples", daily_new)
 
+    # ── 2. MalwareBazaar hourly feeds (no auth, fills current day) ───────────
+    hourly_new = _download_mb_hourly_feeds(hours_back=24)
+    log.info("Hourly feeds: +%d new PE samples", hourly_new)
+
+    # ── 3. Malshare per-file API (rate-limited, good for fresh samples) ───────
     if malshare_key:
-        # Malshare path — simpler auth, raw binary download (no ZIP)
-        # Malshare's own hashes: guaranteed downloadable from Malshare
-        # MB CSV hashes: tried against MB auth methods only (not Malshare cross-ref)
-        MALSHARE_DAILY_LIMIT = 2000
-        ms_hashes = _get_hashes_malshare(malshare_key, target=MALSHARE_DAILY_LIMIT)
-        mb_hashes = _get_hashes_bulk_csv(target=MALSHARE_DAILY_LIMIT * 5) if api_key else []
-        # Malshare hashes first (high success rate), then MB hashes (tried via MB auth)
-        combined = list(dict.fromkeys(ms_hashes + mb_hashes))
-        log.info("Hash pool: %d (Malshare=%d, MB CSV=%d)", len(combined), len(ms_hashes), len(mb_hashes))
+        ms_hashes = _get_hashes_malshare(malshare_key, target=2000)
+        if ms_hashes:
+            already = {f.name for f in MALWARE_DIR.iterdir()}
+            todo_ms = [h for h in ms_hashes if h[:24] not in already][:2000]
+            log.info("Malshare: %d hashes to download", len(todo_ms))
+            ms_ok = ms_err = 0
 
-        already_have = {f.name for f in MALWARE_DIR.iterdir()}
-        # Cap: Malshare daily limit applies only to Malshare downloads; MB downloads are separate
-        ms_todo = [h for h in ms_hashes if h[:24] not in already_have][:MALSHARE_DAILY_LIMIT]
-        mb_todo = [h for h in mb_hashes if h[:24] not in already_have and h not in ms_hashes]
-        todo = ms_todo + mb_todo
-        log.info("To download: %d Malshare + %d MB CSV = %d total", len(ms_todo), len(mb_todo), len(todo))
-
-    else:
-        # MB-only path: get hash list from CSV
-        all_hashes: set[str] = set(_get_hashes_bulk_csv(target=per_family * len(MALWARE_TAGS)))
-        if len(all_hashes) < 500:
-            all_hashes.update(_get_hashes_recent(1000))
-        already_have = {f.name for f in MALWARE_DIR.iterdir()}
-        todo = [h for h in all_hashes if h[:24] not in already_have]
-        log.info("Hashes to download: %d (via MalwareBazaar)", len(todo))
-
-    if not todo:
-        log.info("Nothing to download.")
-        return MALWARE_DIR
-
-    ok = errors = 0
-
-    _MB_HEADERS = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0",
-        "Accept": "application/zip, application/octet-stream, */*",
-        "Referer": "https://bazaar.abuse.ch/",
-    }
-
-    def _dl(sha256: str) -> bool:
-        """Try Malshare first, then MalwareBazaar (both endpoints). First win saves the file."""
-        time.sleep(0.05)
-        dest = MALWARE_DIR / sha256[:24]
-        if dest.exists() and dest.stat().st_size > 0:
-            return True
-        import requests
-
-        def _save(raw: bytes) -> bool:
-            try:
-                with zipfile.ZipFile(io.BytesIO(raw)) as zf:
-                    for name in zf.namelist():
-                        dest.write_bytes(zf.read(name, pwd=ZIP_PASS))
-                        return True
-            except Exception:
-                pass
-            if len(raw) > 512 and raw[:2] == b"MZ":
-                dest.write_bytes(raw)
-                return True
-            return False
-
-        # 1. Malshare (raw binary, no password)
-        if malshare_key:
-            try:
-                r = requests.get(MALSHARE_API,
-                                 params={"api_key": malshare_key, "action": "getfile", "hash": sha256},
-                                 timeout=60)
-                ct = r.headers.get("content-type", "")
-                if r.status_code == 200 and "text" not in ct and "json" not in ct and "html" not in ct:
-                    if len(r.content) > 512:
-                        dest.write_bytes(r.content)
-                        return True
-            except Exception:
-                pass
-
-        # 2–5. MalwareBazaar — try every plausible auth method
-        if api_key:
-            mb_attempts = [
-                # (method, url, extra_headers, post_data)
-                ("POST", MB_API, {},
-                 {"query": "get_file", "sha256_hash": sha256, "api_key": api_key}),
-                ("POST", MB_API, {"Auth-Key": api_key},
-                 {"query": "get_file", "sha256_hash": sha256}),
-                ("POST", MB_API, {"Authorization": f"Token {api_key}"},
-                 {"query": "get_file", "sha256_hash": sha256}),
-                ("GET",  f"https://bazaar.abuse.ch/sample/{sha256}/",
-                 {"Auth-Key": api_key, "Authorization": f"Token {api_key}"}, None),
-            ]
-            for method, url, extra_hdrs, post_data in mb_attempts:
+            def _dl_malshare(sha256: str) -> bool:
+                time.sleep(0.05)
+                dest = MALWARE_DIR / sha256[:24]
+                if dest.exists() and dest.stat().st_size > 0:
+                    return True
                 try:
-                    hdrs = {**_MB_HEADERS, **extra_hdrs}
-                    if method == "POST":
-                        r = requests.post(url, data=post_data, headers=hdrs, timeout=60)
-                    else:
-                        r = requests.get(url, headers=hdrs, timeout=60, allow_redirects=True)
+                    r = _req.get(
+                        MALSHARE_API,
+                        params={"api_key": malshare_key, "action": "getfile", "hash": sha256},
+                        timeout=60,
+                    )
                     ct = r.headers.get("content-type", "")
-                    if r.status_code == 200 and "html" not in ct:
-                        if _save(r.content):
-                            return True
+                    if r.status_code == 200 and "text" not in ct and "json" not in ct and "html" not in ct:
+                        raw = r.content
+                        if len(raw) > 512:
+                            if raw[:2] == b"MZ":
+                                dest.write_bytes(raw)
+                                return True
+                            # might be ZIP
+                            seen: set = set()
+                            if _extract_pe_from_zip_bytes(raw, MALWARE_DIR, seen, prefix=sha256[:8]):
+                                return True
                 except Exception:
                     pass
+                return False
 
-        return False
+            with ThreadPoolExecutor(max_workers=min(threads, 20)) as pool:
+                futs = {pool.submit(_dl_malshare, h): h for h in todo_ms}
+                for i, fut in enumerate(as_completed(futs), 1):
+                    if fut.result():
+                        ms_ok += 1
+                    else:
+                        ms_err += 1
+                    if i % 200 == 0:
+                        log.info("  Malshare: %d / %d  (ok=%d err=%d)", i, len(todo_ms), ms_ok, ms_err)
+            log.info("Malshare download: %d ok, %d errors", ms_ok, ms_err)
 
-    with ThreadPoolExecutor(max_workers=min(threads, 20)) as pool:
-        futures = {pool.submit(_dl, h): h for h in todo}
-        for i, fut in enumerate(as_completed(futures), 1):
-            if fut.result():
-                ok += 1
-            else:
-                errors += 1
-            if i % 200 == 0:
-                log.info("  %d / %d  (ok=%d err=%d)", i, len(todo), ok, errors)
-
-    total = len(list(MALWARE_DIR.iterdir()))
-    log.info("Download complete: %d ok, %d errors. Total on disk: %d", ok, errors, total)
+    after = len(list(MALWARE_DIR.iterdir()))
+    log.info("Download complete. Total on disk: %d (+%d from this run)", after, after - before)
     return MALWARE_DIR
 
 
@@ -579,6 +582,8 @@ def main():
                     help="Benign samples to collect (default: 8000)")
     ap.add_argument("--threads",       type=int, default=50,
                     help="Parallel download workers (default: 50)")
+    ap.add_argument("--days-back",     type=int, default=30,
+                    help="How many days of MalwareBazaar daily feeds to pull (default: 30, no auth needed)")
     ap.add_argument("--estimators",    type=int, default=300,
                     help="RandomForest trees (default: 300)")
     ap.add_argument("--theZoo",          type=Path, default=None,
@@ -620,6 +625,7 @@ def main():
             threads=args.threads,
             api_key=args.mb_api_key,
             malshare_key=args.malshare_key,
+            days_back=args.days_back,
         )
         collect_benign(target=args.benign_count)
     else:
