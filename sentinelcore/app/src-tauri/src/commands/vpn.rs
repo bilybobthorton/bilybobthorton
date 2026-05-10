@@ -2,6 +2,7 @@ use crate::commands::auth::get_token;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::time::Duration;
+use tauri::Emitter;
 use tokio::sync::mpsc::UnboundedSender;
 
 const API_BASE: &str = "https://api.redgaurd.com";
