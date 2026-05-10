@@ -66,4 +66,4 @@ jobs:
           username: root
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           source: RedGuard_Setup.exe
-          target: /opt/redguard/downloads/
+          target: /var/www/downloads/
