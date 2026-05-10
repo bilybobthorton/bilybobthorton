@@ -1,6 +1,6 @@
 {
   "productName": "RedGuard",
-  "version": "0.1.4",
+  "version": "0.1.7",
   "identifier": "com.redgaurd.app",
   "build": {
     "frontendDist": "../dist",
