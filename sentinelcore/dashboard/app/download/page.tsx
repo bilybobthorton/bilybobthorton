@@ -1,7 +1,7 @@
 "use client";
 import { Download, Shield, Monitor, Zap, Lock } from "lucide-react";
 
-const DOWNLOAD_URL = "http://dashboard.redgaurd.com/files/RedGuard_Setup.exe";
+const DOWNLOAD_URL = "https://dashboard.redgaurd.com/files/RedGuard_Setup.exe";
 
 const FEATURES = [
   { icon: Shield, text: "Real-time malware protection" },
