@@ -14,6 +14,9 @@ htmlcov/
 node_modules/
 .next/
 *.log
+# Rust build artifacts
+agent/target/
+app/src-tauri/target/
 uploads/
 *.db
 *.sqlite3
