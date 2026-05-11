@@ -32,8 +32,8 @@ push_asset() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SHOPIFY_DIR="$REPO_ROOT/sentinelcore/shopify"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SHOPIFY_DIR="$REPO_ROOT/shopify"
 
 echo "==> Deploying Shopify theme assets to $STORE (theme $THEME_ID)"
 
